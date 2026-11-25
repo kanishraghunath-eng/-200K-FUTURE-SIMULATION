@@ -49,7 +49,7 @@ class CoreTests(unittest.TestCase):
         )
         stop_result = walk_forward_barrier_diagnostic(
             falling, target_pct=0.01, stop_pct=0.01, horizon=2,
-            min_train=3, paths=20, seed=3
+            min_train=3, paths=20, seed=3, estimation_window=3
         )
         self.assertTrue(target_result["rows"])
         self.assertTrue(stop_result["rows"])
