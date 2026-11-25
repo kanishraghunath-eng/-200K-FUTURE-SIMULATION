@@ -1,4 +1,7 @@
-"""Numerically stable GBM generation with bounded working-memory chunks."""
+"""Numerically stable GBM chunks. drift is arithmetic GBM mu, not mean log return.
+
+Each log increment is (mu - volatility**2 / 2) * dt + sigma * sqrt(dt) * Z.
+"""
 import math
 import numpy as np
 
