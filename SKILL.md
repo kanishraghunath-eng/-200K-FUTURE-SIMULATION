@@ -1,7 +1,7 @@
 ---
 name: 200k-future-simulation
-version: 2.2.0
-description: Universal educational Monte Carlo scenario skill with dated-data validation, CSV loading and memory-efficient summaries.
+version: 2.3.0
+description: Universal educational Monte Carlo scenario skill with corrected drift semantics, collect-all data audits and memory-efficient summaries.
 ---
 
 # 200K Future Simulation — Universal AI Skill
@@ -12,7 +12,7 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 ## Mandatory rules
 1. Never invent prices, dates, news, fundamentals, data sources, or results. State data provenance and freshness.
 2. Request instrument, market, interval, date range, currency and source when essential. Prefer machine-readable CSV with date and close columns; screenshots alone are insufficient for robust simulation.
-3. Validate positive finite closes, ISO timestamps, ordering, duplicates, gaps, declared interval, currency metadata and corporate-action review status. Never silently sort, interpolate, drop or adjust data.
+3. Validate positive finite closes, ISO timestamps, ordering, duplicates, gaps, declared interval, currency metadata and corporate-action review status. The default validator is fail-fast; use collect_all_errors=True for structured errors and warnings. Never silently sort, interpolate, drop or adjust data.
 4. A generic engine cannot independently verify exchange calendars, currency correctness or corporate-action adjustments. Mark them unverified unless source evidence or explicit review is supplied.
 5. Use 200,000 paths by default when computation and data quality permit. Report actual count, seed, horizon, interval, drift assumption and volatility estimate.
 6. Prefer streamed summary mode for long horizons or memory-constrained devices. It retains terminal values and optional barrier counts, not the full paths-by-steps matrix.
@@ -24,7 +24,7 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 1. Define instrument, market, timeframe, forecast horizon and analysis question.
 2. Load CSV using engine.data_io.load_price_csv; review timestamp order, duplicates, price values, interval gaps, currency and corporate-action status.
 3. Calculate historical returns, annualized volatility, drawdown, VaR, expected shortfall and Sharpe only when meaningful.
-4. Run reproducible GBM scenarios; use return_paths=False when a full path matrix is unnecessary.
+4. Run reproducible GBM scenarios; use return_paths=False when a full path matrix is unnecessary. Historical mode defaults to drift_convention=corrected so simulated mean log drift matches historical mean log return. Use legacy only to reproduce v2.2.0 outputs; disclose this convention because it changes historical-mode distributions and walk-forward diagnostics.
 5. For hypothetical long-only barriers require 0 < stop < entry < target and report target-first, stop-first, neither and same-step ambiguity.
 6. Separate deterministic shocks from probability scenarios.
 7. Run walk-forward diagnostics only with sufficient data; calibration is not profitability.
@@ -35,7 +35,7 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 - validate_price_series and validate_dated_prices: numeric, timestamp, ordering, duplicate and interval checks.
 - volatility_profile: historical volatility with explicit annualization frequency.
 - apply_price_shock: deterministic stress transformation.
-- iter_gbm_path_chunks and safe_gbm_paths: chunked GBM path generation and numerical-saturation reporting.
+- iter_gbm_path_chunks and safe_gbm_paths: chunked GBM path generation and numerical-saturation reporting. The primitive drift argument is arithmetic GBM mu, not mean log return.
 
 ## Limitations
 GBM assumes constant parameters and lognormal increments. It does not inherently capture jumps, volatility clustering, fat tails, regime changes, liquidity, spreads, slippage, market impact, taxes, corporate actions, halts, overnight gaps or intrabar high/low ordering. Close-only data cannot establish intrabar barrier order. Exchange holidays and corporate actions require trusted external calendars and adjustment metadata.
@@ -49,3 +49,7 @@ GBM assumes constant parameters and lognormal increments. It does not inherently
 - Deterministic stress scenarios, clearly labeled
 - Validation diagnostics when available
 - Limitations, uncertainty and conservative conclusion
+
+
+## v2.3.0 compatibility note
+Historical simulations now use corrected drift by default. The legacy convention reproduces the prior v2.2.0 parameterization. Walk-forward scores can change after this correction and should be re-evaluated; neither convention establishes profitability.
