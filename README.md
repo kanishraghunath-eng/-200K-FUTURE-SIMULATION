@@ -19,6 +19,8 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
 - Corrected historical GBM drift: historical mean log return is converted to arithmetic GBM drift before simulation.
 - Added drift_convention=legacy to reproduce v2.2.0 historical simulation semantics; corrected is the default.
 - Added drift metadata to simulation and JSON reports; walk-forward diagnostics accept the convention.
+- Added rolling-window walk-forward calibration (default 252 observations) and a leakage-safe empirical baseline using only fully observed prior barrier outcomes.
+- Reports model and baseline multiclass Brier scores, Brier skill score and per-class observed/predicted frequencies.
 - Added collect-all dated-data audit with structured errors and warnings; default fail-fast behavior is preserved.
 - CSV audit mode returns prices=None when validation fails; no automatic sorting, dropping or repair.
 
@@ -29,6 +31,9 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
 - Added terminal quantiles and optional barrier probabilities in streamed mode.
 - Added dependency-free JSON report generation.
 - Preserved the original full-path API as the default.
+
+## Walk-forward calibration
+The walk-forward diagnostic defaults to a rolling 252-observation estimation window (appropriate for daily data when configured as 252 sessions per year). It reports a causal empirical baseline built only from prior barrier outcomes whose full forecast horizons were already observed. A positive Brier skill score means the GBM probabilities scored better than this baseline on the evaluated sample; it does not establish profitability or future reliability. Set `estimation_window` explicitly for other sampling intervals and compare multiple untouched out-of-sample periods.
 
 ## Limitations
 Currency labels and corporate-action review flags are metadata, not independent verification. Exchange holidays require a trusted market calendar. GBM scenarios are conditional illustrations, not predictions or guarantees.
