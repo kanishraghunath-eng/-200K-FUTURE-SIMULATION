@@ -205,5 +205,35 @@ class V23DataAuditTests(unittest.TestCase):
                 estimation_window=2)
 
 
+
+    def test_calibration_blend_uses_baseline_until_matured_history_exists(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        result = walk_forward_barrier_diagnostic(
+            synthetic_prices(140), min_train=60, horizon=5, paths=20,
+            estimation_window=60, calibration_window=60,
+            min_calibration_observations=5)
+        first = result["rows"][0]
+        self.assertEqual(first["calibration_observations"], 0)
+        self.assertEqual(first["calibration_alpha"], 0.0)
+        np.testing.assert_allclose(first["predicted"], first["baseline_predicted"])
+        # At index 65, only the forecast made at index 60 has a fully observed
+        # five-observation outcome. The four more recent forecasts are excluded.
+        self.assertEqual(result["rows"][5]["index"], 65)
+        self.assertEqual(result["rows"][5]["calibration_observations"], 1)
+
+    def test_calibrated_probabilities_are_normalized(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        result = walk_forward_barrier_diagnostic(
+            synthetic_prices(150), min_train=60, horizon=5, paths=30,
+            estimation_window=60, calibration_window=60,
+            min_calibration_observations=5)
+        for row in result["rows"]:
+            self.assertAlmostEqual(sum(row["predicted"]), 1.0, places=12)
+            self.assertAlmostEqual(sum(row["raw_predicted"]), 1.0, places=12)
+            self.assertGreaterEqual(row["calibration_alpha"], 0.0)
+            self.assertLessEqual(row["calibration_alpha"], 1.0)
+        self.assertIn("raw_multiclass_brier_score", result)
+
+
 if __name__ == "__main__":
     unittest.main()
