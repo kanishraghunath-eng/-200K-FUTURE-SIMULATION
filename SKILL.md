@@ -1,6 +1,6 @@
 ---
 name: 200k-future-simulation
-version: 2.0.0
+version: 2.1.0
 description: Universal, platform-independent skill for transparent 200,000-path Monte Carlo price-scenario analysis using user-supplied or verified historical data.
 ---
 
