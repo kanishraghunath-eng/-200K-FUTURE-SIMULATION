@@ -50,6 +50,8 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
     class_predicted = np.zeros(3, dtype=float)
     class_baseline = np.zeros(3, dtype=float)
     first_origin = max(min_train, estimation_window)
+    if len(p) <= first_origin + horizon:
+        raise ValueError("insufficient prices for the requested estimation_window and horizon")
 
     for i in range(first_origin, len(p) - horizon):
         train_start = max(0, i + 1 - estimation_window)
