@@ -10,7 +10,9 @@ def build_simulation_report(simulation, risk_metrics=None, data_status=None):
         "model": metadata.get("model", "not specified"),
         "assumptions": {key: metadata.get(key) for key in
                         ("paths", "steps", "seed", "drift_mode",
-                         "annualized_drift", "annualized_volatility")},
+                         "annualized_drift", "annualized_volatility",
+                         "drift_definition", "drift_convention",
+                         "annualized_arithmetic_drift", "simulated_log_drift")},
         "simulation_summary": summary,
         "historical_risk": risk_metrics or {},
         "limitations": [
