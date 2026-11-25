@@ -38,7 +38,7 @@ class V23DriftTests(unittest.TestCase):
         legacy = simulate_price_paths(p, 12, paths=300, seed=77, drift_convention="legacy")
         sigma = corrected["metadata"]["annualized_volatility"]
         offset = np.log(corrected["paths"][:, -1] / legacy["paths"][:, -1])
-        np.testing.assert_allclose(offset, 0.5 * sigma ** 2, rtol=1e-10, atol=1e-10)
+        np.testing.assert_allclose(offset, 0.5 * sigma ** 2 * (12 / 252), rtol=1e-10, atol=1e-10)
 
     def test_legacy_metadata_preserves_v22_drift(self):
         p = synthetic_prices()
@@ -59,6 +59,28 @@ class V23DriftTests(unittest.TestCase):
     def test_invalid_drift_convention_rejected(self):
         with self.assertRaisesRegex(ValueError, "drift_convention"):
             simulate_price_paths(synthetic_prices(), 5, paths=5, drift_convention="unknown")
+
+    def test_simulation_uses_one_observation_interval_per_step(self):
+        p = synthetic_prices()
+        result = simulate_price_paths(p, 5, paths=20, periods_per_year=252)
+        self.assertAlmostEqual(result["metadata"]["step_year_fraction"], 1 / 252)
+        self.assertAlmostEqual(result["metadata"]["horizon_years"], 5 / 252)
+
+    def test_explicit_step_year_fraction_controls_deterministic_drift(self):
+        _, chunk, _ = next(iter_gbm_path_chunks(
+            100.0, 0.2, 0.0, 5, paths=2, seed=1, step_year_fraction=1/252))
+        np.testing.assert_allclose(chunk[:, -1], 100.0 * math.exp(0.2 * 5 / 252))
+
+    def test_invalid_step_year_fraction_rejected(self):
+        with self.assertRaisesRegex(ValueError, "step_year_fraction"):
+            simulate_price_paths(synthetic_prices(), 5, paths=5, step_year_fraction=0)
+
+    def test_backtest_uses_matching_observation_horizon(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        result = walk_forward_barrier_diagnostic(
+            synthetic_prices(90), min_train=60, horizon=5, paths=10)
+        self.assertAlmostEqual(result["step_year_fraction"], 1 / 252)
+        self.assertAlmostEqual(result["horizon_years"], 5 / 252)
 
     def test_backtest_accepts_legacy_convention(self):
         from engine.backtest import walk_forward_barrier_diagnostic
