@@ -73,6 +73,7 @@ class V23DataAuditTests(unittest.TestCase):
             {"date": "2026-01-03", "close": "100"},
             {"date": "2026-01-02", "close": "0"},
             {"date": "2026-01-03", "close": "1000"},
+            {"date": "2026-01-04", "close": "10000"},
         ]
         audit = audit_dated_prices(rows)
         codes = {item["code"] for item in audit["errors"]}
