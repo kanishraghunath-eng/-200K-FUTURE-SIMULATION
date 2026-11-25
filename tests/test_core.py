@@ -40,6 +40,22 @@ class CoreTests(unittest.TestCase):
         self.assertGreater(r["observations"], 0)
         self.assertGreaterEqual(r["multiclass_brier_score"], 0)
 
+    def test_backtest_actual_class_labels(self):
+        rising = [100, 102, 104, 106, 120, 130, 140, 150, 160]
+        falling = [160, 150, 140, 130, 120, 110, 100, 90, 80]
+        target_result = walk_forward_barrier_diagnostic(
+            rising, target_pct=0.01, stop_pct=0.01, horizon=2,
+            min_train=3, paths=20, seed=3
+        )
+        stop_result = walk_forward_barrier_diagnostic(
+            falling, target_pct=0.01, stop_pct=0.01, horizon=2,
+            min_train=3, paths=20, seed=3
+        )
+        self.assertTrue(target_result["rows"])
+        self.assertTrue(stop_result["rows"])
+        self.assertTrue(all(row["actual_class"] == "target_first" for row in target_result["rows"]))
+        self.assertTrue(all(row["actual_class"] == "stop_first" for row in stop_result["rows"]))
+
     def test_invalid_series_rejected(self):
         with self.assertRaises(ValueError):
             validate_price_series([1, 0, 2])
