@@ -2,6 +2,11 @@
 
 ## [2.3.0] - 2026-11-25
 
+### Fixed
+- Corrected forecast timestep scaling: high-level simulations now use one observation interval per step (`1/periods_per_year` years) by default, with an explicit `step_year_fraction` override.
+- Walk-forward barrier diagnostics now forecast the same observation interval as the held-out bars and report the resulting horizon in years.
+- The low-level GBM primitive retains its historical `1/steps` default for direct-call compatibility; callers can pass an explicit year fraction.
+
 ### Changed
 - Corrected historical GBM drift semantics. Historical annualized mean log return is converted to arithmetic GBM drift by adding half the annualized variance before path generation.
 - Added explicit drift metadata to simulation outputs and JSON reports.
