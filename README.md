@@ -1,4 +1,4 @@
-# 200K Future Simulation — Universal AI Skill v2.2.0
+# 200K Future Simulation — Universal AI Skill v2.3.0
 
 Reusable platform-neutral skill instructions plus a Python scenario-analysis engine. Libraries and instructions only: no AI agents, broker integration or trade execution.
 
@@ -13,6 +13,13 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
     python -m compileall -q engine tests
     python -m unittest discover -s tests -v
 
+## v2.3.0
+- Corrected historical GBM drift: historical mean log return is converted to arithmetic GBM drift before simulation.
+- Added drift_convention=legacy to reproduce v2.2.0 historical simulation semantics; corrected is the default.
+- Added drift metadata to simulation and JSON reports; walk-forward diagnostics accept the convention.
+- Added collect-all dated-data audit with structured errors and warnings; default fail-fast behavior is preserved.
+- CSV audit mode returns prices=None when validation fails; no automatic sorting, dropping or repair.
+
 ## v2.2.0
 - Added dated-series validation for ISO timestamps, ordering, duplicates, positive finite closes and optional interval checks.
 - Added standard-library CSV loader for date,close files.
@@ -23,3 +30,10 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
 
 ## Limitations
 Currency labels and corporate-action review flags are metadata, not independent verification. Exchange holidays require a trusted market calendar. GBM scenarios are conditional illustrations, not predictions or guarantees.
+
+
+## Drift conventions
+The GBM primitive accepts arithmetic drift mu and applies log increments `(mu - sigma^2 / 2) * dt`. Historical mode estimates annualized mean log return. The corrected default adds `0.5 * sigma^2` before calling the primitive so the simulated expected log drift matches the historical estimate. Set `drift_convention="legacy"` only when reproducing v2.2.0 outputs. This correction changes historical-mode path distributions and walk-forward scores; compare and re-baseline diagnostics before interpreting results.
+
+## Data audit
+`validate_dated_prices(..., collect_all_errors=True)` returns structured `errors` and `warnings`. `load_price_csv(..., collect_all_errors=True)` returns `prices=None` for invalid input. The default remains fail-fast for compatibility. A gap greater than three days is a warning when no strict calendar-daily interval is declared; this is not an exchange-calendar determination.
