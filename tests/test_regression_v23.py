@@ -119,6 +119,13 @@ class V23DataAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported expected_interval"):
             audit_dated_prices([], expected_interval="hourly")
 
+    def test_mixed_timezone_awareness_is_reported(self):
+        rows = [{"date": "2026-01-01", "close": 100},
+                {"date": "2026-01-02T00:00:00+00:00", "close": 101},
+                {"date": "2026-01-03", "close": 102}]
+        codes = {x["code"] for x in audit_dated_prices(rows)["errors"]}
+        self.assertIn("mixed_timezone_awareness", codes)
+
     def test_collect_all_csv_returns_no_prices_when_invalid(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "bad.csv"
