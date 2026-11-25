@@ -104,8 +104,8 @@ def validate_dated_prices(records, currency=None, expected_interval=None,
                           max_abs_return=5.0):
     """Validate ISO-dated closes; fail-fast remains the v2.2.0 default."""
     if collect_all_errors:
-        audit = audit_dated_prices(records, expected_interval, max_abs_return)
         rows = list(records)
+        audit = audit_dated_prices(rows, expected_interval, max_abs_return)
         audit["currency"] = currency
         audit["corporate_actions"] = "user_reviewed" if corporate_actions_reviewed else "unverified"
         if audit["valid"]:
