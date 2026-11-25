@@ -36,7 +36,7 @@ class CoreTests(unittest.TestCase):
         self.assertAlmostEqual(apply_price_shock([100, 101], -10)[0], 90)
 
     def test_walk_forward_diagnostic_runs(self):
-        r = walk_forward_barrier_diagnostic(self.prices, horizon=3, min_train=80, paths=100)
+        r = walk_forward_barrier_diagnostic(self.prices, horizon=3, min_train=80, paths=100, estimation_window=80)
         self.assertGreater(r["observations"], 0)
         self.assertGreaterEqual(r["multiclass_brier_score"], 0)
 
@@ -45,7 +45,7 @@ class CoreTests(unittest.TestCase):
         falling = [160, 150, 140, 130, 120, 110, 100, 90, 80]
         target_result = walk_forward_barrier_diagnostic(
             rising, target_pct=0.01, stop_pct=0.01, horizon=2,
-            min_train=3, paths=20, seed=3
+            min_train=3, paths=20, seed=3, estimation_window=3
         )
         stop_result = walk_forward_barrier_diagnostic(
             falling, target_pct=0.01, stop_pct=0.01, horizon=2,
