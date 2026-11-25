@@ -1,29 +1,25 @@
-# 200K Future Simulation — Universal AI Skill v2.1
+# 200K Future Simulation — Universal AI Skill v2.2.0
 
-A reusable, platform-neutral instruction skill plus a Python scenario-analysis engine. This repository contains **libraries and instructions only — no AI agents, broker integration, or trade execution**.
+Reusable platform-neutral skill instructions plus a Python scenario-analysis engine. Libraries and instructions only: no AI agents, broker integration or trade execution.
 
 ## Contents
-- `SKILL.md`: assistant operating instructions and analysis workflow.
-- `engine/`: reproducible Monte Carlo, barrier probabilities, historical risk metrics, walk-forward diagnostics, and specialist modules.
-- `tests/`: automated unit and integration tests, including target/stop backtest label regression coverage.
-- `examples/sample_prices.csv`: small illustrative dataset.
-- `adapters/PLATFORM_NOTES.md`: platform-neutral installation notes.
+- SKILL.md: universal assistant operating instructions.
+- engine/: Monte Carlo, barrier probabilities, risk metrics, walk-forward diagnostics, CSV loading and report generation.
+- engine/specialists/: data-quality, volatility, deterministic shock and numerical-stability libraries.
+- tests/: unit and integration tests.
 
 ## Quick start
-```bash
-python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
-```
+    python -m pip install -r requirements.txt
+    python -m compileall -q engine tests
+    python -m unittest discover -s tests -v
 
-## Core behavior
-- 200,000 Monte Carlo paths by default when computation and data quality permit.
-- Reproducible GBM scenario paths with explicit seed and assumptions.
-- Long-only target/stop first-hit probabilities, including same-step ambiguity.
-- Historical volatility, VaR, expected shortfall, drawdown, and Sharpe diagnostics.
-- Walk-forward multiclass Brier-score diagnostic (not a profitability test).
-- Conservative `WAIT`, `NO TRADE`, or `INSUFFICIENT DATA` conclusions when justified.
+## v2.2.0
+- Added dated-series validation for ISO timestamps, ordering, duplicates, positive finite closes and optional interval checks.
+- Added standard-library CSV loader for date,close files.
+- Added streamed GBM chunks and return_paths=False summary mode to avoid allocating the full paths-by-steps output matrix.
+- Added terminal quantiles and optional barrier probabilities in streamed mode.
+- Added dependency-free JSON report generation.
+- Preserved the original full-path API as the default.
 
-## Important limitations
-Monte Carlo outputs are conditional scenarios, not guaranteed predictions. GBM does not inherently model jumps, volatility clustering, fat tails, regime changes, liquidity, costs, or market impact. Close-only data cannot establish intrabar barrier ordering. Never claim live data or execution unless actually available and verified.
-
-See [SKILL.md](SKILL.md) for the complete operating rules.
+## Limitations
+Currency labels and corporate-action review flags are metadata, not independent verification. Exchange holidays require a trusted market calendar. GBM scenarios are conditional illustrations, not predictions or guarantees.
