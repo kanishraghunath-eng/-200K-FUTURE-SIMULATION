@@ -27,7 +27,7 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 4. Run reproducible GBM scenarios; use return_paths=False when a full path matrix is unnecessary. By default each simulated step is one observation interval (`1/periods_per_year` years; e.g. 1/252 for daily bars, 1/52 for weekly bars). Set `step_year_fraction` explicitly when the observation interval differs. Report `horizon_years`; do not interpret `steps` as a one-year horizon. Historical mode defaults to drift_convention=corrected so simulated mean log drift matches historical mean log return. Use legacy only to reproduce v2.2.0 outputs; disclose this convention because it changes historical-mode distributions and walk-forward diagnostics.
 5. For hypothetical long-only barriers require 0 < stop < entry < target and report target-first, stop-first, neither and same-step ambiguity.
 6. Separate deterministic shocks from probability scenarios.
-7. Run walk-forward diagnostics only with sufficient data; calibration is not profitability.
+7. Run walk-forward diagnostics with a rolling estimation window (default 252 observations for daily bars). Compare the multiclass Brier score against the leakage-safe empirical baseline, which may use only prior barrier outcomes whose complete horizons were observed before the forecast origin. Report the Brier skill score and per-class observed versus predicted frequencies. Use multiple untouched out-of-sample periods; calibration is not profitability.
 8. Generate a structured JSON report using engine.report.
 9. State limitations and conclude conservatively.
 
@@ -52,4 +52,4 @@ GBM assumes constant parameters and lognormal increments. It does not inherently
 
 
 ## v2.3.0 compatibility note
-Historical simulations now use corrected drift by default. The legacy convention reproduces the prior v2.2.0 parameterization. Walk-forward scores can change after this correction and should be re-evaluated; neither convention establishes profitability.
+Historical simulations now use corrected drift by default. The legacy convention reproduces the prior v2.2.0 parameterization. Walk-forward scores can change after this correction and should be re-evaluated. The walk-forward diagnostic defaults to a rolling 252-observation estimation window and reports a causal empirical baseline plus Brier skill score; configure the window for the actual bar interval. Neither convention establishes profitability.
