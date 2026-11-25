@@ -72,7 +72,14 @@ def audit_dated_prices(records, expected_interval=None, max_abs_return=5.0):
             errors.append({"code": "weekend_observation", "row": i,
                            "message": f"weekend observation at row {i}"})
     valid_stamps = [(i, d) for i, d in enumerate(parsed, 1) if d is not None]
+    timezone_kinds = {stamp.utcoffset() is not None for _, stamp in valid_stamps}
+    mixed_timezones = len(timezone_kinds) > 1
+    if mixed_timezones:
+        errors.append({"code": "mixed_timezone_awareness",
+                       "message": "timestamps mix timezone-aware and timezone-naive values"})
     for (prev_i, prev), (cur_i, cur) in zip(valid_stamps, valid_stamps[1:]):
+        if mixed_timezones:
+            continue
         if cur < prev:
             errors.append({"code": "out_of_order_timestamp", "row": cur_i,
                            "message": f"timestamps are not strictly increasing at row {cur_i}"})
@@ -90,9 +97,6 @@ def audit_dated_prices(records, expected_interval=None, max_abs_return=5.0):
             if abs(change) > max_abs_return:
                 errors.append({"code": "implausible_return", "row": i + 1,
                                "message": f"implausible single-period return at row {i + 1}"})
-    if len(valid_prices) < 3 and len(rows) >= 3:
-        # Invalid close rows are already reported above; this adds no duplicate error.
-        pass
     return {"valid": not errors, "errors": errors, "warnings": warnings,
             "observations": len(rows), "valid_close_count": len(valid_prices),
             "currency": None, "interval_check": expected_interval or "not specified",
