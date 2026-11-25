@@ -14,6 +14,8 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
     python -m unittest discover -s tests -v
 
 ## v2.3.0
+- Fixed forecast timestep scaling: each simulated step now defaults to one observation interval (`1/periods_per_year` years), rather than dividing a one-year horizon by the requested number of steps.
+- Added explicit `step_year_fraction` override and horizon metadata; walk-forward diagnostics use the same interval as their observed future bars.
 - Corrected historical GBM drift: historical mean log return is converted to arithmetic GBM drift before simulation.
 - Added drift_convention=legacy to reproduce v2.2.0 historical simulation semantics; corrected is the default.
 - Added drift metadata to simulation and JSON reports; walk-forward diagnostics accept the convention.
