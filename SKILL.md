@@ -24,7 +24,7 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 1. Define instrument, market, timeframe, forecast horizon and analysis question.
 2. Load CSV using engine.data_io.load_price_csv; review timestamp order, duplicates, price values, interval gaps, currency and corporate-action status.
 3. Calculate historical returns, annualized volatility, drawdown, VaR, expected shortfall and Sharpe only when meaningful.
-4. Run reproducible GBM scenarios; use return_paths=False when a full path matrix is unnecessary. Historical mode defaults to drift_convention=corrected so simulated mean log drift matches historical mean log return. Use legacy only to reproduce v2.2.0 outputs; disclose this convention because it changes historical-mode distributions and walk-forward diagnostics.
+4. Run reproducible GBM scenarios; use return_paths=False when a full path matrix is unnecessary. By default each simulated step is one observation interval (`1/periods_per_year` years; e.g. 1/252 for daily bars, 1/52 for weekly bars). Set `step_year_fraction` explicitly when the observation interval differs. Report `horizon_years`; do not interpret `steps` as a one-year horizon. Historical mode defaults to drift_convention=corrected so simulated mean log drift matches historical mean log return. Use legacy only to reproduce v2.2.0 outputs; disclose this convention because it changes historical-mode distributions and walk-forward diagnostics.
 5. For hypothetical long-only barriers require 0 < stop < entry < target and report target-first, stop-first, neither and same-step ambiguity.
 6. Separate deterministic shocks from probability scenarios.
 7. Run walk-forward diagnostics only with sufficient data; calibration is not profitability.
