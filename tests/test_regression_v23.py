@@ -78,14 +78,14 @@ class V23DriftTests(unittest.TestCase):
     def test_backtest_uses_matching_observation_horizon(self):
         from engine.backtest import walk_forward_barrier_diagnostic
         result = walk_forward_barrier_diagnostic(
-            synthetic_prices(90), min_train=60, horizon=5, paths=10)
+            synthetic_prices(90), min_train=60, horizon=5, paths=10, estimation_window=60)
         self.assertAlmostEqual(result["step_year_fraction"], 1 / 252)
         self.assertAlmostEqual(result["horizon_years"], 5 / 252)
 
     def test_backtest_accepts_legacy_convention(self):
         from engine.backtest import walk_forward_barrier_diagnostic
         result = walk_forward_barrier_diagnostic(synthetic_prices(90), min_train=60,
-                    horizon=5, paths=10, drift_convention="legacy")
+                    horizon=5, paths=10, drift_convention="legacy", estimation_window=60)
         self.assertEqual(result["drift_convention"], "legacy")
 
 
@@ -170,6 +170,39 @@ class V23DataAuditTests(unittest.TestCase):
         report = build_simulation_report(sim)
         self.assertEqual(report["assumptions"]["drift_convention"], "corrected")
         self.assertIn("simulated_log_drift", report["assumptions"])
+
+
+    def test_walk_forward_defaults_to_rolling_estimation_window(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        result = walk_forward_barrier_diagnostic(
+            synthetic_prices(330), horizon=5, paths=20, estimation_window=252)
+        self.assertGreater(result["observations"], 0)
+        self.assertEqual(result["estimation_window"], 252)
+        self.assertEqual(result["first_forecast_index"], 252)
+        self.assertEqual(result["rows"][0]["index"], 252)
+        self.assertGreaterEqual(result["rows"][0]["baseline_observations"], 1)
+
+    def test_walk_forward_reports_causal_baseline_and_skill_score(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        result = walk_forward_barrier_diagnostic(
+            synthetic_prices(120), min_train=60, horizon=5, paths=20,
+            estimation_window=60)
+        self.assertIn("baseline_multiclass_brier_score", result)
+        self.assertIn("brier_skill_score", result)
+        self.assertEqual(set(result["class_summary"]), {
+            "target_first", "stop_first", "neither"})
+        for row in result["rows"]:
+            self.assertEqual(len(row["predicted"]), 3)
+            self.assertEqual(len(row["baseline_predicted"]), 3)
+            self.assertAlmostEqual(sum(row["baseline_predicted"]), 1.0)
+            self.assertLessEqual(row["baseline_observations"], 60)
+
+    def test_walk_forward_rejects_too_small_estimation_window(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        with self.assertRaisesRegex(ValueError, "estimation_window"):
+            walk_forward_barrier_diagnostic(
+                synthetic_prices(100), min_train=60, horizon=5, paths=10,
+                estimation_window=2)
 
 
 if __name__ == "__main__":
