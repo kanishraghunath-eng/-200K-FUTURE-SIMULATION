@@ -1,11 +1,11 @@
-# 200K Future Simulation — Universal AI Skill
+# 200K Future Simulation — Universal AI Skill v2.1
 
 A reusable, platform-neutral instruction skill plus a Python scenario-analysis engine. This repository contains **libraries and instructions only — no AI agents, broker integration, or trade execution**.
 
 ## Contents
 - `SKILL.md`: assistant operating instructions and analysis workflow.
 - `engine/`: reproducible Monte Carlo, barrier probabilities, historical risk metrics, walk-forward diagnostics, and specialist modules.
-- `tests/`: automated unit and integration tests.
+- `tests/`: automated unit and integration tests, including target/stop backtest label regression coverage.
 - `examples/sample_prices.csv`: small illustrative dataset.
 - `adapters/PLATFORM_NOTES.md`: platform-neutral installation notes.
 
