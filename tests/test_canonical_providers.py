@@ -9,7 +9,7 @@ from engine.providers import CsvProvider, ProviderRegistry
 
 def manifest(**overrides):
     values = dict(instrument_id="TEST", asset_class="equity_index",
-                  source="fixture", currency="INR", interval="daily",
+                  source="fixture", currency="INR", interval="daily", periods_per_year=252,
                   timezone="Asia/Kolkata", calendar="NSE",
                   adjustment_basis="unknown")
     values.update(overrides)
@@ -41,7 +41,7 @@ class CanonicalValidationTests(unittest.TestCase):
         self.assertFalse(validate_canonical_rows(rows, manifest())["valid"])
 
     def test_intraday_gap_is_reported(self):
-        m = manifest(interval="5m")
+        m = manifest(interval="5m", periods_per_year=19656)
         rows = [{"timestamp":d,"close":p} for d,p in [
             ("2026-01-05T09:15:00+05:30",100),
             ("2026-01-05T09:20:00+05:30",101),
