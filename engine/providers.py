@@ -288,7 +288,7 @@ class EodhdProvider(PriceDataProvider):
                 "events": payload,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "source": "https://eodhd.com/api/" + action_type + "/"
-                          + urllib.parse.quote(dataset.instrument_id),
+                          + urllib.parse.quote(action_symbol),
             }
         return result
 
