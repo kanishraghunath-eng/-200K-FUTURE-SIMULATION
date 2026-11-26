@@ -32,6 +32,9 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
 - Added dependency-free JSON report generation.
 - Preserved the original full-path API as the default.
 
+## Optional Stooq provider cross-check
+The simulation engine, CSV input workflow, and ordinary tests do **not** need a Stooq API key or any provider credential. The multi-market OOS workflow also continues when `STOOQ_API_KEY` is absent: its report records `api_key_required` for the optional SPY/Stooq comparison, while the Yahoo-based OOS and Monte Carlo stability diagnostics still run. Configure the `STOOQ_API_KEY` GitHub Actions repository secret only if you separately want to attempt that provider comparison. A missing or rejected key must never be represented as a successful independent-provider validation.
+
 ## Walk-forward calibration
 The walk-forward diagnostic defaults to a rolling 252-observation estimation window (appropriate for daily data when configured as 252 sessions per year). It reports a causal empirical baseline built only from prior barrier outcomes whose full forecast horizons were already observed. A convex blend of raw GBM probabilities and that baseline is calibrated on prior forecasts whose outcomes have fully matured; until the minimum calibration sample is available, the baseline is used. The Brier skill score compares the calibrated probabilities with the empirical baseline on the evaluated sample; it does not establish profitability or future reliability. Set `estimation_window` explicitly for other sampling intervals and compare multiple untouched out-of-sample periods. The regime-evaluation script compares improvement gates of 0%, 0.5%, 1%, and 2%; these are experiments, not an assertion that any threshold is universally optimal.
 
