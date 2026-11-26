@@ -31,7 +31,7 @@ def evaluate_dataset(item, paths=1000):
         provider = CsvProvider(item["path"], item.get("timestamp_column", "date"),
                                item.get("close_column", "close"))
     elif provider_name == "yahoo":
-        provider = YahooFinanceChartProvider()
+        provider = YahooFinanceChartProvider(include_ohlcv=item.get("include_ohlcv", True))
     elif provider_name == "stooq":
         provider = StooqCsvProvider()
     elif provider_name == "eodhd":
@@ -47,14 +47,18 @@ def evaluate_dataset(item, paths=1000):
                 "manifest": manifest.to_dict()}
     audit = validate_canonical_rows(fetched["rows"], manifest,
                                     require_timezone=bool(item.get("require_timezone", False)))
-    if provider_name == "csv":
-        raw = Path(item["path"]).read_bytes()
-    else:
-        raw = json.dumps(fetched["rows"], sort_keys=True, separators=(",", ":")).encode("utf-8")
+    canonical_bytes = json.dumps(
+        fetched["rows"], sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    source_sha256 = fetched.get("source_sha256")
+    if source_sha256 is None and provider_name == "csv":
+        source_sha256 = hashlib.sha256(Path(item["path"]).read_bytes()).hexdigest()
     base = {
         "instrument_id": manifest.instrument_id, "asset_class": manifest.asset_class,
         "source": fetched["source"], "provider": fetched["provider"],
-        "data_sha256": hashlib.sha256(raw).hexdigest(),
+        "source_sha256": source_sha256,
+        "data_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+        "ohlcv_included": fetched.get("ohlcv_included"),
         "manifest": manifest.to_dict(), "audit": audit,
     }
     if not audit["valid"]:
