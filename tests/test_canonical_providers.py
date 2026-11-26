@@ -5,7 +5,7 @@ from pathlib import Path
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import canonicalize_rows, validate_canonical_rows
-from engine.providers import (CsvProvider, ProviderRegistry, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider)
+from engine.providers import (CsvProvider, ProviderRegistry, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider, reconcile_corporate_actions)
 from scripts.evaluate_dataset_manifest_oos import evaluate_dataset
 
 
@@ -170,6 +170,46 @@ class ProviderTests(unittest.TestCase):
             with patch("urllib.request.urlopen", return_value=FakeResponse(body)):
                 with self.assertRaisesRegex(RuntimeError, "authentication, quota, or challenge"):
                     StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
+
+    def test_yahoo_provider_extracts_dividend_and_split_events(self):
+        import datetime
+        import json
+        event_stamp = int(datetime.datetime(
+            2026, 1, 6, tzinfo=datetime.timezone.utc
+        ).timestamp())
+        stamps = [int(datetime.datetime(2026, 1, day, tzinfo=datetime.timezone.utc).timestamp())
+                  for day in (5, 6, 7)]
+        payload = {"chart": {"result": [{
+            "timestamp": stamps,
+            "indicators": {"quote": [{"close": [100, 99, 25]}]},
+            "events": {
+                "dividends": {str(event_stamp): {"date": event_stamp, "amount": 1.0}},
+                "splits": {str(event_stamp): {
+                    "date": event_stamp, "numerator": 4, "denominator": 1
+                }},
+            },
+        }], "error": None}}
+        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+            result = YahooFinanceChartProvider().fetch(manifest())
+        actions = result["corporate_actions"]
+        self.assertEqual(actions["dividend_count"], 1)
+        self.assertEqual(actions["split_count"], 1)
+        self.assertEqual(len(actions["sha256"]), 64)
+
+    def test_corporate_action_reconciliation_matches_events_and_detects_mismatch(self):
+        yahoo = {"events": [
+            {"date": "2026-01-06", "type": "dividends", "amount": 1.0},
+            {"date": "2026-01-06", "type": "splits", "numerator": 4.0, "denominator": 1.0},
+        ]}
+        independent = {
+            "div": {"events": [{"date": "2026-01-06", "unadjustedValue": 1.0}]},
+            "splits": {"events": [{"date": "2026-01-06", "split": "4.000000/1.000000"}]},
+        }
+        result = reconcile_corporate_actions(yahoo, independent)
+        self.assertEqual(result["status"], "matched")
+        independent["div"]["events"][0]["unadjustedValue"] = 0.5
+        result = reconcile_corporate_actions(yahoo, independent)
+        self.assertEqual(result["status"], "mismatch")
 
     def test_eodhd_provider_maps_adjusted_close(self):
         import json
