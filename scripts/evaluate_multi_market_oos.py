@@ -115,26 +115,41 @@ def block_bootstrap_skill_interval(rows, block_length=HORIZON, replicates=2000, 
     n = len(rows)
     if n < max(20, 4 * block_length):
         return {"status": "insufficient_sample", "block_length": block_length}
-    differences = [float(x["baseline_brier_score"]) - float(x["brier_score"])
-                   for x in rows]
-    baselines = [float(x["baseline_brier_score"]) for x in rows]
-    observed_difference = sum(differences) / n
-    observed_baseline = sum(baselines) / n
+    segments = {}
+    for row in rows:
+        segment = row.get("_bootstrap_segment", "all")
+        segments.setdefault(segment, []).append(row)
+    segment_values = []
+    for segment_rows in segments.values():
+        segment_values.append((
+            [float(x["baseline_brier_score"]) - float(x["brier_score"])
+             for x in segment_rows],
+            [float(x["baseline_brier_score"]) for x in segment_rows],
+        ))
+    observed_difference = sum(sum(x[0]) for x in segment_values) / n
+    observed_baseline = sum(sum(x[1]) for x in segment_values) / n
     if observed_baseline <= 0:
         return {"status": "invalid_baseline", "block_length": block_length}
 
     rng = random.Random(seed)
-    blocks_per_sample = math.ceil(n / block_length)
     skill_samples = []
     null_tail = 0
     for _ in range(replicates):
-        indices = []
-        for _ in range(blocks_per_sample):
-            start = rng.randrange(n)
-            indices.extend((start + offset) % n for offset in range(block_length))
-        indices = indices[:n]
-        mean_difference = sum(differences[i] for i in indices) / n
-        mean_baseline = sum(baselines[i] for i in indices) / n
+        sampled_differences = []
+        sampled_baselines = []
+        for differences, baselines in segment_values:
+            segment_n = len(differences)
+            blocks_per_sample = math.ceil(segment_n / block_length)
+            indices = []
+            for _ in range(blocks_per_sample):
+                start = rng.randrange(segment_n)
+                indices.extend((start + offset) % segment_n
+                               for offset in range(block_length))
+            indices = indices[:segment_n]
+            sampled_differences.extend(differences[i] for i in indices)
+            sampled_baselines.extend(baselines[i] for i in indices)
+        mean_difference = sum(sampled_differences) / n
+        mean_baseline = sum(sampled_baselines) / n
         if mean_baseline > 0:
             skill_samples.append(mean_difference / mean_baseline)
         if mean_difference <= 0:
@@ -232,6 +247,8 @@ def evaluate_oos(dataset_rows, paths):
                 min_calibration_improvement=gate,
             )
             oos_rows = [r for r in result["rows"] if r["index"] >= first_oos_index]
+            for row in oos_rows:
+                row["_bootstrap_segment"] = fold["name"]
             if not oos_rows:
                 skipped.append({"fold": fold["name"], "reason": "no scored OOS forecasts"})
                 continue
