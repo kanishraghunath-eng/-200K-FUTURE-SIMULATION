@@ -1,0 +1,127 @@
+name: Multi-Market Out-of-Sample Validation
+
+on:
+  push:
+    branches: [feature/v2.3.0]
+    paths:
+      - "engine/**"
+      - "scripts/evaluate_multi_market_oos.py"
+      - "scripts/evaluate_dataset_manifest_oos.py"
+      - "scripts/analyze_manifest_oos_uncertainty.py"
+      - "reports/oos/**"
+      - "datasets/confirmatory_oos_manifest.json"
+      - "engine/futures_roll_audit.py"
+      - "scripts/audit_futures_roll.py"
+      - "scripts/run_confirmatory_oos.py"
+      - "engine/dataset_manifest.py"
+      - "engine/canonical_data.py"
+      - "engine/providers.py"
+      - "datasets/multi_asset_manifest.json"
+      - "tests/**"
+      - "docs/OOS_VALIDATION_MASTER_PLAN.md"
+      - "docs/DATA_SOURCE_AND_ADJUSTMENT_AUDIT.md"
+      - "docs/CONFIRMATORY_OOS_PROTOCOL_v1.md"
+      - ".github/workflows/multi-market-oos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multi-market-oos:
+    name: Held-out market validation and 5k/10k path stability
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v2.3.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install engine dependency
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run unit and regression tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Smoke-check manifest-driven multi-market runner
+        run: python scripts/evaluate_dataset_manifest_oos.py --help
+
+      - name: Run per-asset manifest-driven OOS evaluation
+        env:
+          STOOQ_API_KEY: ${{ secrets.STOOQ_API_KEY }}
+          EODHD_API_TOKEN: ${{ secrets.EODHD_API_TOKEN }}
+        run: |
+          python scripts/evaluate_dataset_manifest_oos.py \
+            --manifest datasets/multi_asset_manifest.json \
+            --paths 1000 \
+            --output multi_asset_oos_report.json
+
+      - name: Analyze per-asset OOS statistical uncertainty
+        run: |
+          python scripts/analyze_manifest_oos_uncertainty.py \
+            --input multi_asset_oos_report.json \
+            --output multi_asset_oos_uncertainty.json \
+            --replicates 2000 \
+            --block-length 5
+
+      - name: Upload per-asset validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-asset-oos-report
+          path: multi_asset_oos_report.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload per-asset statistical uncertainty report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-asset-oos-uncertainty-report
+          path: multi_asset_oos_uncertainty.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Run pre-registered confirmatory OOS readiness check
+        env:
+          EODHD_API_TOKEN: ${{ secrets.EODHD_API_TOKEN }}
+        run: |
+          python scripts/run_confirmatory_oos.py \
+            --manifest datasets/confirmatory_oos_manifest.json \
+            --paths 1000 \
+            --replicates 5000 \
+            --minimum-forecasts 250 \
+            --block-length 5 \
+            --output confirmatory_oos_report.json
+
+      - name: Upload confirmatory OOS readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: confirmatory-oos-readiness-report
+          path: confirmatory_oos_report.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Run existing multi-market held-out evaluation
+        env:
+          STOOQ_API_KEY: ${{ secrets.STOOQ_API_KEY }}
+        run: |
+          python scripts/evaluate_multi_market_oos.py \
+            --paths 1000 \
+            --convergence-samples-per-fold 20 \
+            --output multi_market_oos_report.json
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-market-oos-report
+          path: multi_market_oos_report.json
+          if-no-files-found: error
+          retention-days: 30

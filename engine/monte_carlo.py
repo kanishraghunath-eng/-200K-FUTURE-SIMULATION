@@ -1,13 +1,19 @@
-"""Reproducible GBM simulation with optional memory-bounded summary mode."""
+"""Reproducible GBM simulation with optional memory-bounded summaries."""
 import math
 import numpy as np
 from .specialists import validate_price_series
 from .specialists.numerical_stability import safe_gbm_paths, iter_gbm_path_chunks
 
+
 def simulate_price_paths(prices, steps, paths=200_000, drift_mode="historical", seed=7,
                          chunk_size=10_000, periods_per_year=252, return_paths=True,
-                         entry=None, target=None, stop=None):
-    """Full paths remain default; return_paths=False streams chunks and retains summaries."""
+                         entry=None, target=None, stop=None, drift_convention="corrected",
+                         step_year_fraction=None):
+    """Simulate future observations.
+
+    By default one simulated step represents one input observation interval:
+    1/periods_per_year years. Pass step_year_fraction to override explicitly.
+    """
     check = validate_price_series(prices)
     values = np.asarray(prices, dtype=float)
     if not isinstance(steps, int) or steps < 1:
@@ -16,27 +22,51 @@ def simulate_price_paths(prices, steps, paths=200_000, drift_mode="historical", 
         raise ValueError("paths must be a positive integer")
     if drift_mode not in {"historical", "zero"}:
         raise ValueError("drift_mode must be 'historical' or 'zero'")
+    if drift_convention not in {"corrected", "legacy"}:
+        raise ValueError("drift_convention must be 'corrected' or 'legacy'")
     if not isinstance(periods_per_year, int) or periods_per_year <= 0:
         raise ValueError("periods_per_year must be a positive integer")
+    if step_year_fraction is None:
+        dt = 1.0 / periods_per_year
+    else:
+        try:
+            dt = float(step_year_fraction)
+        except (TypeError, ValueError):
+            raise ValueError("step_year_fraction must be a finite positive number")
+        if not math.isfinite(dt) or dt <= 0:
+            raise ValueError("step_year_fraction must be a finite positive number")
     barriers = any(x is not None for x in (entry, target, stop))
     if barriers and (entry is None or target is None or stop is None or not (0 < stop < entry < target)):
         raise ValueError("provide all barriers satisfying 0 < stop < entry < target")
     rets = np.diff(np.log(values))
-    mu = float(np.mean(rets) * periods_per_year) if drift_mode == "historical" else 0.0
+    mean_log = float(np.mean(rets) * periods_per_year)
     sigma = float(np.std(rets, ddof=1) * math.sqrt(periods_per_year))
+    if drift_mode == "zero":
+        mu, annualized_drift = 0.0, 0.0
+    else:
+        annualized_drift = mean_log
+        mu = mean_log + (0.5 * sigma ** 2 if drift_convention == "corrected" else 0.0)
+    simulated_log = mu - 0.5 * sigma ** 2
     meta = {"paths": paths, "steps": steps, "drift_mode": drift_mode,
-            "annualized_drift": mu, "annualized_volatility": sigma, "seed": seed,
-            "input_quality": check, "model": "GBM log-space; equally spaced steps",
-            "numerically_saturated": False}
+            "annualized_drift": annualized_drift, "annualized_volatility": sigma,
+            "seed": seed, "input_quality": check,
+            "model": "GBM log-space; one step per observation interval",
+            "numerically_saturated": False,
+            "drift_definition": "annualized mean log return (historical); arithmetic GBM drift (zero)",
+            "drift_convention": drift_convention, "annualized_arithmetic_drift": mu,
+            "simulated_log_drift": simulated_log,
+            "step_year_fraction": dt, "horizon_years": steps * dt,
+            "periods_per_year": periods_per_year}
     if return_paths:
-        result = safe_gbm_paths(float(values[-1]), mu, sigma, steps, paths, seed, chunk_size)
+        result = safe_gbm_paths(float(values[-1]), mu, sigma, steps, paths, seed,
+                                chunk_size, dt)
         meta["numerically_saturated"] = result["numerically_saturated"]
         return {"paths": result["paths"], "metadata": meta}
     terminal = np.empty(paths, dtype=np.float64)
     counts = {"target": 0, "stop": 0, "neither": 0, "ambiguous": 0}
-    for begin, chunk, flag in iter_gbm_path_chunks(float(values[-1]), mu, sigma,
-                                                   steps, paths, seed, chunk_size):
-        meta["numerically_saturated"] = meta["numerically_saturated"] or flag
+    for begin, chunk, flag in iter_gbm_path_chunks(
+            float(values[-1]), mu, sigma, steps, paths, seed, chunk_size, dt):
+        meta["numerically_saturated"] |= flag
         terminal[begin:begin + len(chunk)] = chunk[:, -1]
         if barriers:
             future = chunk[:, 1:]
@@ -59,6 +89,7 @@ def simulate_price_paths(prices, steps, paths=200_000, drift_mode="historical", 
                         "neither_probability": counts["neither"]/paths,
                         "same_step_ambiguous_probability": counts["ambiguous"]/paths})
     return {"paths": None, "metadata": meta, "summary": summary}
+
 
 def barrier_probabilities(path_matrix, entry, target, stop):
     p = np.asarray(path_matrix, dtype=float)

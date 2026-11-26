@@ -2,7 +2,7 @@ name: Universal Skill Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -31,7 +31,19 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Compile all Python modules
-        run: python -m compileall -q engine tests
+        run: python -m compileall -q engine scripts tests
+
+      - name: Check manifest OOS runner interface
+        run: python scripts/evaluate_dataset_manifest_oos.py --help
+
+      - name: Check manifest OOS uncertainty analyzer interface
+        run: python scripts/analyze_manifest_oos_uncertainty.py --help
+
+      - name: Check confirmatory OOS runner interface
+        run: python scripts/run_confirmatory_oos.py --help
+
+      - name: Check futures roll audit interface
+        run: python scripts/audit_futures_roll.py --help
 
       - name: Run complete unittest suite
         run: python -m unittest discover -s tests -v

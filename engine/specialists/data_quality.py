@@ -2,6 +2,7 @@
 import math
 from datetime import date, datetime
 
+
 def validate_price_series(prices, min_observations=3, max_abs_return=5.0):
     if not isinstance(min_observations, int) or min_observations < 2:
         raise ValueError("min_observations must be an integer >= 2")
@@ -22,22 +23,109 @@ def validate_price_series(prices, min_observations=3, max_abs_return=5.0):
             "min_price": min(values), "max_price": max(values),
             "max_abs_return_observed": max(abs(r) for r in returns)}
 
+
+def _parse_iso(raw, row_number):
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        try:
+            return datetime.combine(date.fromisoformat(str(raw)), datetime.min.time())
+        except (TypeError, ValueError):
+            raise ValueError(f"invalid ISO date/timestamp at row {row_number}") from None
+
+
+def audit_dated_prices(records, expected_interval=None, max_abs_return=5.0):
+    """Collect detectable data errors and warnings without repairing input rows."""
+    if expected_interval not in (None, "calendar_daily", "business_daily"):
+        raise ValueError("unsupported expected_interval")
+    if not math.isfinite(float(max_abs_return)) or max_abs_return <= 0:
+        raise ValueError("max_abs_return must be finite and > 0")
+    rows = list(records)
+    errors, warnings, parsed, closes = [], [], [], []
+    if len(rows) < 3:
+        errors.append({"code": "too_few_observations", "message": "at least 3 dated observations are required"})
+    for i, row in enumerate(rows, 1):
+        try:
+            parsed.append(_parse_iso(row.get("date"), i))
+        except (AttributeError, ValueError) as exc:
+            parsed.append(None)
+            errors.append({"code": "invalid_timestamp", "row": i, "message": str(exc)})
+        try:
+            close = float(row.get("close"))
+            if not math.isfinite(close) or close <= 0:
+                raise ValueError
+            closes.append(close)
+        except (AttributeError, TypeError, ValueError):
+            closes.append(None)
+            errors.append({"code": "invalid_close", "row": i,
+                           "message": f"close must be finite and positive at row {i}"})
+    seen = {}
+    for i, stamp in enumerate(parsed, 1):
+        if stamp is None:
+            continue
+        if stamp in seen:
+            errors.append({"code": "duplicate_timestamp", "row": i,
+                           "message": f"duplicate timestamp at row {i} (first seen at row {seen[stamp]})"})
+        else:
+            seen[stamp] = i
+        if expected_interval == "business_daily" and stamp.weekday() >= 5:
+            errors.append({"code": "weekend_observation", "row": i,
+                           "message": f"weekend observation at row {i}"})
+    valid_stamps = [(i, d) for i, d in enumerate(parsed, 1) if d is not None]
+    timezone_kinds = {stamp.utcoffset() is not None for _, stamp in valid_stamps}
+    mixed_timezones = len(timezone_kinds) > 1
+    if mixed_timezones:
+        errors.append({"code": "mixed_timezone_awareness",
+                       "message": "timestamps mix timezone-aware and timezone-naive values"})
+    for (prev_i, prev), (cur_i, cur) in zip(valid_stamps, valid_stamps[1:]):
+        if mixed_timezones:
+            continue
+        if cur < prev:
+            errors.append({"code": "out_of_order_timestamp", "row": cur_i,
+                           "message": f"timestamps are not strictly increasing at row {cur_i}"})
+        seconds = (cur - prev).total_seconds()
+        if expected_interval == "calendar_daily" and abs(seconds - 86400) > 1:
+            errors.append({"code": "interval_mismatch", "row": cur_i,
+                           "message": f"timestamps are not equally spaced calendar-daily observations at row {cur_i}"})
+        elif seconds > 3 * 86400:
+            warnings.append({"code": "possible_missing_session", "row": prev_i,
+                             "message": f"gap greater than 3 days after row {prev_i}; verify market calendar"})
+    valid_prices = [x for x in closes if x is not None]
+    for i in range(1, len(closes)):
+        if closes[i-1] is not None and closes[i] is not None:
+            change = closes[i] / closes[i-1] - 1
+            if abs(change) > max_abs_return:
+                errors.append({"code": "implausible_return", "row": i + 1,
+                               "message": f"implausible single-period return at row {i + 1}"})
+    return {"valid": not errors, "errors": errors, "warnings": warnings,
+            "observations": len(rows), "valid_close_count": len(valid_prices),
+            "currency": None, "interval_check": expected_interval or "not specified",
+            "possible_missing_session_after_rows": sorted({w["row"] for w in warnings})}
+
+
 def validate_dated_prices(records, currency=None, expected_interval=None,
-                          corporate_actions_reviewed=False):
-    """Validate ISO-dated closes; exchange holidays are never guessed."""
+                          corporate_actions_reviewed=False, collect_all_errors=False,
+                          max_abs_return=5.0):
+    """Validate ISO-dated closes; fail-fast remains the v2.2.0 default."""
+    if collect_all_errors:
+        rows = list(records)
+        audit = audit_dated_prices(rows, expected_interval, max_abs_return)
+        audit["currency"] = currency
+        audit["corporate_actions"] = "user_reviewed" if corporate_actions_reviewed else "unverified"
+        if audit["valid"]:
+            dates = [_parse_iso(row.get("date"), i) for i, row in enumerate(rows, 1)]
+            closes = [float(row["close"]) for row in rows]
+            deltas = [(dates[i] - dates[i-1]).total_seconds() for i in range(1, len(dates))]
+            audit.update({"equal_spacing_seconds": len(set(round(x, 3) for x in deltas)) == 1,
+                          "first_timestamp": dates[0].isoformat(), "last_timestamp": dates[-1].isoformat(),
+                          "price_series": validate_price_series(closes, max_abs_return=max_abs_return)})
+        return audit
     rows = list(records)
     if len(rows) < 3:
         raise ValueError("at least 3 dated observations are required")
     dates, closes = [], []
     for index, row in enumerate(rows):
-        raw = row.get("date")
-        try:
-            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-        except (TypeError, ValueError):
-            try:
-                parsed = datetime.combine(date.fromisoformat(str(raw)), datetime.min.time())
-            except (TypeError, ValueError):
-                raise ValueError(f"invalid ISO date/timestamp at row {index + 1}") from None
+        parsed = _parse_iso(row.get("date"), index + 1)
         dates.append(parsed)
         try:
             close = float(row.get("close"))
@@ -65,4 +153,4 @@ def validate_dated_prices(records, currency=None, expected_interval=None,
             "equal_spacing_seconds": len(set(round(x, 3) for x in deltas)) == 1,
             "possible_missing_session_after_rows": gap_indices,
             "first_timestamp": dates[0].isoformat(), "last_timestamp": dates[-1].isoformat(),
-            "price_series": validate_price_series(closes)}
+            "price_series": validate_price_series(closes, max_abs_return=max_abs_return)}
