@@ -52,6 +52,24 @@ class CanonicalValidationTests(unittest.TestCase):
         self.assertTrue(audit["valid"])
         self.assertIn("interval_spacing_mismatch",{w["code"] for w in audit["warnings"]})
 
+    def test_valid_optional_ohlcv(self):
+        rows = [
+            {"timestamp":"2026-01-05","open":99,"high":102,"low":98,"close":100,"volume":1000},
+            {"timestamp":"2026-01-06","open":100,"high":103,"low":99,"close":101,"volume":1200},
+            {"timestamp":"2026-01-07","open":101,"high":102,"low":97,"close":99,"volume":900},
+        ]
+        self.assertTrue(validate_canonical_rows(rows, manifest())["valid"])
+
+    def test_invalid_ohlcv_range_rejected(self):
+        rows = [
+            {"timestamp":"2026-01-05","open":99,"high":98,"low":98,"close":100,"volume":1000},
+            {"timestamp":"2026-01-06","open":100,"high":103,"low":99,"close":101,"volume":1200},
+            {"timestamp":"2026-01-07","open":101,"high":102,"low":97,"close":99,"volume":900},
+        ]
+        audit = validate_canonical_rows(rows, manifest())
+        self.assertFalse(audit["valid"])
+        self.assertIn("inconsistent_ohlc_range", {x["code"] for x in audit["errors"]})
+
     def test_duplicate_timestamp_rejected(self):
         rows = [{"timestamp":d,"close":p} for d,p in [
             ("2026-01-05",100),("2026-01-05",101),("2026-01-06",99)]]
