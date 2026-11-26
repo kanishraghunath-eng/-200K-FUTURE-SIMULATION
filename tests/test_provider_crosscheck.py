@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from scripts.evaluate_multi_market_oos import cross_provider_check
+from engine.monte_carlo import simulate_price_paths
 
 
 class FakeResponse:
@@ -54,6 +55,18 @@ class StooqProviderTests(unittest.TestCase):
         request_url = urlopen.call_args.args[0].full_url
         self.assertIn("apikey=test-key", request_url)
         self.assertNotIn("test-key", result["source_url"])
+
+    def test_core_simulation_runs_without_stooq_key_or_network(self):
+        prices = [100.0 * math.exp(0.001 * i + 0.002 * math.sin(i)) for i in range(40)]
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("scripts.evaluate_multi_market_oos.urllib.request.urlopen",
+                       side_effect=AssertionError("core simulation must not access Stooq")):
+                result = simulate_price_paths(
+                    prices, steps=5, paths=64, seed=11, return_paths=False
+                )
+        self.assertEqual(result["summary"]["path_count"], 64)
+        self.assertEqual(result["summary"]["storage_mode"], "streamed_summary")
+        self.assertEqual(result["metadata"]["paths"], 64)
 
     def test_non_csv_api_key_challenge_is_not_misreported_as_zero_overlap(self):
         with patch.dict(os.environ, {"STOOQ_API_KEY": "bad-key"}):
