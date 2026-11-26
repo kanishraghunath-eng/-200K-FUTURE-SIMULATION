@@ -10,6 +10,7 @@ on:
       - "engine/dataset_manifest.py"
       - "engine/canonical_data.py"
       - "engine/providers.py"
+      - "datasets/multi_asset_manifest.json"
       - "tests/**"
       - ".github/workflows/multi-market-oos.yml"
   workflow_dispatch:
@@ -44,6 +45,21 @@ jobs:
 
       - name: Smoke-check manifest-driven multi-market runner
         run: python scripts/evaluate_dataset_manifest_oos.py --help
+
+      - name: Run per-asset manifest-driven OOS evaluation
+        run: |
+          python scripts/evaluate_dataset_manifest_oos.py \
+            --manifest datasets/multi_asset_manifest.json \
+            --paths 1000 \
+            --output multi_asset_oos_report.json
+
+      - name: Upload per-asset validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-asset-oos-report
+          path: multi_asset_oos_report.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Run existing multi-market held-out evaluation
         env:
