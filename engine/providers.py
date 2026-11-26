@@ -55,6 +55,8 @@ class YahooFinanceChartProvider(PriceDataProvider):
                         "30m": "30m", "1h": "60m", "4h": "60m"}
         if dataset.interval not in interval_map:
             raise ValueError("Yahoo adapter does not support this interval")
+        if dataset.price_field not in {"close", "adjusted_close"}:
+            raise ValueError("Yahoo adapter supports close or adjusted_close only")
         now = int(datetime.now(timezone.utc).timestamp())
         start_ts = int(datetime.fromisoformat(start).replace(tzinfo=timezone.utc).timestamp()) if start else 946684800
         end_ts = int(datetime.fromisoformat(end).replace(tzinfo=timezone.utc).timestamp()) if end else now
@@ -97,6 +99,8 @@ class StooqCsvProvider(PriceDataProvider):
     def fetch(self, dataset, start=None, end=None):
         if dataset.interval != "daily":
             raise ValueError("Stooq adapter currently supports daily data only")
+        if dataset.price_field != "close":
+            raise ValueError("Stooq adapter supplies raw close only")
         params = {"s": dataset.instrument_id.lower(), "i": "d"}
         if start:
             params["d1"] = start.replace("-", "")
