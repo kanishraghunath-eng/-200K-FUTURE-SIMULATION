@@ -70,8 +70,13 @@ class YahooFinanceChartProvider(PriceDataProvider):
                                         "events": "div,splits", "includeAdjustedClose": "true"})
         url = "https://query1.finance.yahoo.com/v8/finance/chart/" + urllib.parse.quote(dataset.instrument_id) + "?" + query
         request = urllib.request.Request(url, headers={"User-Agent": "200k-future-simulation/2.3"})
-        with urllib.request.urlopen(request, timeout=45) as response:
-            raw = response.read()
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"EODHD EOD HTTP error {exc.code}") from None
+        except urllib.error.URLError:
+            raise RuntimeError("EODHD EOD network request failed") from None
         payload = json.loads(raw.decode("utf-8"))
         chart = payload.get("chart", {})
         if chart.get("error") or not chart.get("result"):
@@ -170,8 +175,13 @@ class StooqCsvProvider(PriceDataProvider):
             params["d2"] = end.replace("-", "")
         url = "https://stooq.com/q/d/l/?" + urllib.parse.urlencode(params)
         request = urllib.request.Request(url, headers={"User-Agent": "200k-future-simulation/2.3"})
-        with urllib.request.urlopen(request, timeout=45) as response:
-            raw_bytes = response.read()
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                raw_bytes = response.read()
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"Stooq HTTP error {exc.code}") from None
+        except urllib.error.URLError:
+            raise RuntimeError("Stooq network request failed") from None
         raw = raw_bytes.decode("utf-8-sig")
         lowered = raw.lstrip().lower()
         if ("get your apikey" in lowered or "api key" in lowered
@@ -285,8 +295,17 @@ class EodhdProvider(PriceDataProvider):
                 url, headers={"User-Agent": "200k-future-simulation/2.3",
                               "Accept": "application/json"}
             )
-            with urllib.request.urlopen(request, timeout=45) as response:
-                raw = response.read()
+            try:
+                with urllib.request.urlopen(request, timeout=45) as response:
+                    raw = response.read()
+            except urllib.error.HTTPError as exc:
+                raise RuntimeError(
+                    f"EODHD {action_type} HTTP error {exc.code}"
+                ) from None
+            except urllib.error.URLError:
+                raise RuntimeError(
+                    f"EODHD {action_type} network request failed"
+                ) from None
             payload = json.loads(raw.decode("utf-8"))
             if not isinstance(payload, list):
                 raise RuntimeError(
