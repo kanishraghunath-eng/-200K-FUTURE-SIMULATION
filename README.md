@@ -87,3 +87,5 @@ Run per-dataset diagnostics:
 ```bash
 python scripts/evaluate_dataset_manifest_oos.py --manifest datasets/manifest.json --paths 1000 --output dataset_oos_report.json
 ```
+
+Canonical rows also preserve optional OHLCV fields when present and validate OHLC range consistency and non-negative finite volume; close-only inputs remain valid. Adjusted-close series intentionally do not mix raw OHLC values into the same price basis.
