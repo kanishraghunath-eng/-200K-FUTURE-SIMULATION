@@ -16,7 +16,9 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index."
     },
     {
       "instrument_id": "^GSPC",
@@ -33,7 +35,9 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index."
     },
     {
       "instrument_id": "EURUSD=X",
@@ -52,7 +56,9 @@
       "min_train": 252,
       "estimation_window": 252,
       "include_ohlcv": false,
-      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed."
+      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed.",
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "FX spot pair; issuer dividend/split actions are not applicable to the quoted pair."
     },
     {
       "instrument_id": "BTC-USD",
@@ -69,7 +75,9 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "Spot crypto pair; issuer dividend/split actions are not applicable."
     },
     {
       "instrument_id": "GC=F",
@@ -89,7 +97,9 @@
       "min_train": 252,
       "estimation_window": 252,
       "include_ohlcv": false,
-      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed."
+      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed.",
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "Futures contract chain; roll/contract adjustments are audited separately."
     },
     {
       "instrument_id": "TLT",
@@ -106,7 +116,11 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_provider": "eodhd",
+      "corporate_actions_symbol": "TLT.US",
+      "actions_start": "2002-07-01",
+      "corporate_actions_reference_interval": "daily"
     },
     {
       "instrument_id": "spy.us",
@@ -123,7 +137,11 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_provider": "eodhd",
+      "corporate_actions_symbol": "SPY.US",
+      "actions_start": "1993-01-29",
+      "corporate_actions_reference_interval": "daily"
     },
     {
       "instrument_id": "VTI.US",
@@ -140,7 +158,11 @@
       "price_field": "adjusted_close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "corporate_actions_provider": "eodhd",
+      "corporate_actions_symbol": "VTI.US",
+      "actions_start": "2001-05-24",
+      "corporate_actions_reference_interval": "daily"
     },
     {
       "instrument_id": "SPY",
@@ -160,7 +182,11 @@
       "horizon": 5,
       "min_train": 252,
       "estimation_window": 252,
-      "notes": "Hourly sample added for multi-timeframe exploratory validation; shorter than Yahoo's intraday history limit. Session gaps and vendor availability require review."
+      "notes": "Hourly sample added for multi-timeframe exploratory validation; shorter than Yahoo's intraday history limit. Session gaps and vendor availability require review.",
+      "corporate_actions_provider": "eodhd",
+      "corporate_actions_symbol": "SPY.US",
+      "actions_start": "2025-01-01",
+      "corporate_actions_reference_interval": "daily"
     }
   ]
 }
