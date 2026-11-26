@@ -235,5 +235,35 @@ class V23DataAuditTests(unittest.TestCase):
         self.assertIn("raw_multiclass_brier_score", result)
 
 
+    def test_invalid_min_calibration_improvement_rejected(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        with self.assertRaisesRegex(ValueError, "min_calibration_improvement"):
+            walk_forward_barrier_diagnostic(
+                synthetic_prices(120), min_train=60, horizon=5, paths=10,
+                estimation_window=60, min_calibration_improvement=1.0)
+
+    def test_zero_min_calibration_improvement_preserves_existing_behavior(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        kwargs = dict(prices=synthetic_prices(150), min_train=60, horizon=5,
+                      paths=20, estimation_window=60, calibration_window=60,
+                      min_calibration_observations=5)
+        original = walk_forward_barrier_diagnostic(**kwargs)
+        explicit_zero = walk_forward_barrier_diagnostic(
+            **kwargs, min_calibration_improvement=0.0)
+        self.assertEqual(
+            [r["calibration_alpha"] for r in original["rows"]],
+            [r["calibration_alpha"] for r in explicit_zero["rows"]])
+
+    def test_improvement_gate_never_uses_more_raw_weight_than_ungated(self):
+        from engine.backtest import walk_forward_barrier_diagnostic
+        kwargs = dict(prices=synthetic_prices(180), min_train=60, horizon=5,
+                      paths=20, estimation_window=60, calibration_window=60,
+                      min_calibration_observations=5)
+        ungated = walk_forward_barrier_diagnostic(**kwargs)
+        gated = walk_forward_barrier_diagnostic(
+            **kwargs, min_calibration_improvement=0.05)
+        for old, new in zip(ungated["rows"], gated["rows"]):
+            self.assertLessEqual(new["calibration_alpha"], old["calibration_alpha"])
+
 if __name__ == "__main__":
     unittest.main()
