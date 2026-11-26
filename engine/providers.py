@@ -73,19 +73,30 @@ class YahooFinanceChartProvider(PriceDataProvider):
             raise RuntimeError("Yahoo chart returned no usable result")
         item = chart["result"][0]
         indicators = item.get("indicators", {})
-        if dataset.price_field in {"adjusted_close", "adjclose"}:
+        quote = indicators.get("quote", [{}])[0]
+        adjusted = dataset.price_field in {"adjusted_close", "adjclose"}
+        if adjusted:
             values = indicators.get("adjclose", [{}])[0].get("adjclose")
             basis = "provider_adjusted"
         else:
-            values = indicators.get("quote", [{}])[0].get("close")
+            values = quote.get("close")
             basis = "raw"
         stamps = item.get("timestamp") or []
         if values is None or len(stamps) != len(values):
             raise RuntimeError("Yahoo price series is missing or misaligned")
-        rows = [{"timestamp": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
-                 "close": value, "currency": dataset.currency,
-                 "price_basis": dataset.price_field}
-                for ts, value in zip(stamps, values) if value is not None]
+        rows = []
+        for index, (stamp, value) in enumerate(zip(stamps, values)):
+            if value is None:
+                continue
+            row = {"timestamp": datetime.fromtimestamp(stamp, timezone.utc).isoformat(),
+                   "close": value, "currency": dataset.currency,
+                   "price_basis": dataset.price_field}
+            if not adjusted:
+                for field in ("open", "high", "low", "volume"):
+                    series = quote.get(field)
+                    if series and index < len(series) and series[index] is not None:
+                        row[field] = series[index]
+            rows.append(row)
         if len(rows) < 3:
             raise RuntimeError("Yahoo returned fewer than three usable observations")
         return {"provider": self.name, "source": url, "raw_observations": len(stamps),
@@ -113,9 +124,16 @@ class StooqCsvProvider(PriceDataProvider):
         import csv as _csv
         from io import StringIO
         source_rows = list(_csv.DictReader(StringIO(raw)))
-        rows = [{"timestamp": row["Date"], "close": row["Close"],
-                 "currency": dataset.currency, "price_basis": dataset.price_field}
-                for row in source_rows if row.get("Date") and row.get("Close")]
+        rows = []
+        for source_row in source_rows:
+            if not source_row.get("Date") or not source_row.get("Close"):
+                continue
+            row = {"timestamp": source_row["Date"], "close": source_row["Close"],
+                   "currency": dataset.currency, "price_basis": dataset.price_field}
+            for field in ("Open", "High", "Low", "Volume"):
+                if source_row.get(field) not in (None, ""):
+                    row[field.lower()] = source_row[field]
+            rows.append(row)
         if len(rows) < 3:
             raise RuntimeError("Stooq returned fewer than three usable observations")
         return {"provider": self.name, "source": url,
@@ -151,8 +169,13 @@ class EodhdProvider(PriceDataProvider):
             value = item.get(field)
             if value is None:
                 continue
-            rows.append({"timestamp": item.get("date"), "close": value,
-                         "currency": dataset.currency, "price_basis": dataset.price_field})
+            row = {"timestamp": item.get("date"), "close": value,
+                   "currency": dataset.currency, "price_basis": dataset.price_field}
+            if dataset.price_field == "close":
+                for field in ("open", "high", "low", "volume"):
+                    if item.get(field) is not None:
+                        row[field] = item[field]
+            rows.append(row)
         if len(rows) < 3:
             raise RuntimeError("EODHD returned fewer than three usable observations")
         return {"provider": self.name, "source": url,
