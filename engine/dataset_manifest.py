@@ -115,4 +115,6 @@ class DatasetManifest:
     def to_dict(self):
         """Return JSON-serializable metadata after validation."""
         self.validate()
-        return asdict(self)
+        data = asdict(self)
+        data["effective_periods_per_year"] = self.effective_periods_per_year
+        return data
