@@ -120,6 +120,23 @@
       "horizon": 5,
       "min_train": 252,
       "estimation_window": 252
+    },
+    {
+      "instrument_id": "VTI.US",
+      "asset_class": "etf",
+      "source": "EODHD daily EOD adjusted close (demo token limited coverage)",
+      "currency": "USD",
+      "interval": "daily",
+      "periods_per_year": 252,
+      "timezone": "America/New_York",
+      "calendar": "NYSE",
+      "adjustment_basis": "provider_adjusted",
+      "corporate_actions_reviewed": false,
+      "provider": "eodhd",
+      "price_field": "adjusted_close",
+      "horizon": 5,
+      "min_train": 252,
+      "estimation_window": 252
     }
   ]
 }
