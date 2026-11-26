@@ -1,0 +1,112 @@
+{
+  "report_type": "multi_asset_oos_summary",
+  "generated_from_commit": "678d478cc4e89b1890a24874efcdb58e85b13179",
+  "workflow_run_id": 45828953358,
+  "artifact_id": 15122056103,
+  "paths_per_forecast": 1000,
+  "methodology": "Per-instrument close-only walk-forward GBM barrier probability diagnostics. Brier skill compares the calibrated model with that instrument's causal empirical baseline. It is not a profitability or directional-accuracy score.",
+  "evaluated_instruments": 6,
+  "total_instruments": 7,
+  "results": [
+    {
+      "instrument_id": "^NSEI",
+      "asset_class": "equity_index",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 4708,
+      "oos_forecasts": 4451,
+      "multiclass_brier": 0.49579685558845293,
+      "baseline_brier": 0.4947012705232207,
+      "brier_skill_vs_baseline": -0.002214639683608466,
+      "data_sha256": "b904871ee97a5fbe5c2cc4989541acf75f97acb4ed2310e079700089835c727d",
+      "first_timestamp": "2007-09-17T03:45:00+00:00",
+      "last_timestamp": "2026-11-26T03:45:00+00:00"
+    },
+    {
+      "instrument_id": "^GSPC",
+      "asset_class": "equity_index",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 6766,
+      "oos_forecasts": 6509,
+      "multiclass_brier": 0.4463275668274273,
+      "baseline_brier": 0.44386738929000735,
+      "brier_skill_vs_baseline": -0.005542595822042973,
+      "data_sha256": "2f6d1f1a1f209a54c4410a69adab6d014237d88fd1f0a3d81eb298a41178a999",
+      "first_timestamp": "2000-01-03T14:30:00+00:00",
+      "last_timestamp": "2026-11-25T14:30:00+00:00"
+    },
+    {
+      "instrument_id": "EURUSD=X",
+      "asset_class": "fx",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 5965,
+      "oos_forecasts": 5708,
+      "multiclass_brier": 0.15312698395032132,
+      "baseline_brier": 0.15251248521526645,
+      "brier_skill_vs_baseline": -0.004029170032784579,
+      "data_sha256": "2dc25990d04970432454b1ce6843639226bdcc4e768786d5a094b98b918edc7a",
+      "first_timestamp": "2003-12-01T00:00:00+00:00",
+      "last_timestamp": "2026-11-26T00:00:00+00:00"
+    },
+    {
+      "instrument_id": "BTC-USD",
+      "asset_class": "crypto",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 4454,
+      "oos_forecasts": 4197,
+      "multiclass_brier": 0.6299408197476023,
+      "baseline_brier": 0.6302876531276862,
+      "brier_skill_vs_baseline": 0.0005502779220928344,
+      "data_sha256": "380c501d8ed2139376bbc0409adab6d014daa294ecae67bc4a0c985146733f17",
+      "first_timestamp": "2014-09-17T00:00:00+00:00",
+      "last_timestamp": "2026-11-26T00:00:00+00:00"
+    },
+    {
+      "instrument_id": "GC=F",
+      "asset_class": "commodity_future",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 6587,
+      "oos_forecasts": 6330,
+      "multiclass_brier": 0.5074350376682761,
+      "baseline_brier": 0.5081335543955168,
+      "brier_skill_vs_baseline": 0.001374671523260429,
+      "data_sha256": "cf252361e31b813fa0fb9f3bca39074cd4712f6f867e7db0861bc962d3681a02",
+      "first_timestamp": "2000-08-30T04:00:00+00:00",
+      "last_timestamp": "2026-11-26T13:15:46+00:00",
+      "notes": "Yahoo continuous futures symbol; roll methodology not independently verified."
+    },
+    {
+      "instrument_id": "TLT",
+      "asset_class": "etf",
+      "provider": "yahoo",
+      "status": "evaluated",
+      "price_observations": 6122,
+      "oos_forecasts": 5865,
+      "multiclass_brier": 0.38628185589642255,
+      "baseline_brier": 0.38633555976342493,
+      "brier_skill_vs_baseline": 0.00013900834558244757,
+      "data_sha256": "06026404c64a8e08fd51fab8d700a1bafa343bf8230f39b5229a9fba3f1c7a08",
+      "first_timestamp": "2002-07-30T13:30:00+00:00",
+      "last_timestamp": "2026-11-25T14:30:00+00:00"
+    },
+    {
+      "instrument_id": "spy.us",
+      "asset_class": "etf",
+      "provider": "stooq",
+      "status": "provider_error",
+      "error_type": "RuntimeError",
+      "error": "Stooq returned fewer than three usable observations"
+    }
+  ],
+  "interpretation": [
+    "Six datasets completed the walk-forward diagnostic across equity indices, FX, crypto, commodity futures, and a bond ETF.",
+    "Brier skill was slightly negative for NIFTY 50, S&P 500, and EUR/USD; slightly positive for BTC/USD, gold continuous futures, and TLT. All effects are close to zero.",
+    "These are per-instrument probability-calibration comparisons, not price forecast accuracy, directional hit rate, or profitability.",
+    "The Stooq sample did not return usable data and is recorded as a provider failure, not as a successful second-provider validation.",
+    "This is preliminary coverage from one provider for six datasets. Provider-adjustment and calendar metadata need independent verification; additional providers and held-out regimes are still required."
+  ]
+}
