@@ -4,8 +4,11 @@ Yahoo Finance chart data are adjusted-close snapshots from a third-party service
 This is a reproducible research diagnostic, not investment advice or a profitability test.
 """
 import argparse
+import csv
 import hashlib
 import json
+import math
+import statistics
 import time
 import urllib.error
 import urllib.parse
@@ -35,9 +38,13 @@ FOLDS = [
     {"name": "2015 volatility", "start": "2015-07-01", "end": "2015-12-31"},
     {"name": "COVID shock and rebound", "start": "2020-01-02", "end": "2020-06-30"},
     {"name": "2022 tightening/bear", "start": "2022-01-03", "end": "2022-06-30"},
-    {"name": "Recent holdout", "start": "2024-01-02", "end": "2024-06-28"},
+    {"name": "Recent holdout H1", "start": "2024-01-02", "end": "2024-06-28"},
+    {"name": "Recent holdout H2", "start": "2024-07-01", "end": "2024-12-31"},
+    {"name": "2025 holdout", "start": "2025-01-02", "end": "2025-12-31"},
+    {"name": "2026 holdout YTD", "start": "2026-01-02", "end": "2026-11-25"},
 ]
 GATES = (0.0, 0.005, 0.01, 0.02)
+CONVERGENCE_SEEDS = (7, 101, 2026)
 ESTIMATION = 252
 CALIBRATION_WARMUP = 110
 HORIZON = 5
@@ -191,41 +198,99 @@ def convergence_check(dataset_rows, samples_per_fold):
             entry = train[-1]
             target = entry * (1.0 + TARGET)
             stop = entry * (1.0 - STOP)
-            seed = 7000 + origin
-            outputs = {}
-            for n_paths in (5000, 10000):
-                sim = simulate_price_paths(
-                    train, HORIZON, paths=n_paths, seed=seed,
-                    drift_mode="historical", periods_per_year=252,
-                    chunk_size=10000, return_paths=True,
-                )
-                outputs[str(n_paths)] = barrier_probabilities(
-                    sim["paths"], entry, target, stop
-                )
-            small, large = outputs["5000"], outputs["10000"]
-            keys = ("target_first_probability", "stop_first_probability",
-                    "neither_probability", "same_step_ambiguous_probability")
-            comparisons.append({
-                "fold": fold["name"],
-                "origin_date": dates[origin],
-                "seed": seed,
-                "probability_abs_differences": {
-                    key: abs(small[key] - large[key]) for key in keys
-                },
-                "mean_probability_abs_difference": sum(
-                    abs(small[key] - large[key]) for key in keys[:3]
-                ) / 3.0,
-                "paths_5000": {key: small[key] for key in keys},
-                "paths_10000": {key: large[key] for key in keys},
-            })
-    diffs = [x["mean_probability_abs_difference"] for x in comparisons]
+            for seed_base in CONVERGENCE_SEEDS:
+                seed = seed_base + origin
+                outputs = {}
+                for n_paths in (5000, 10000):
+                    sim = simulate_price_paths(
+                        train, HORIZON, paths=n_paths, seed=seed,
+                        drift_mode="historical", periods_per_year=252,
+                        chunk_size=10000, return_paths=True,
+                    )
+                    outputs[str(n_paths)] = barrier_probabilities(
+                        sim["paths"], entry, target, stop
+                    )
+                small, large = outputs["5000"], outputs["10000"]
+                keys = ("target_first_probability", "stop_first_probability",
+                        "neither_probability", "same_step_ambiguous_probability")
+                comparisons.append({
+                    "fold": fold["name"],
+                    "origin_date": dates[origin],
+                    "seed_base": seed_base,
+                    "seed": seed,
+                    "probability_abs_differences": {
+                        key: abs(small[key] - large[key]) for key in keys
+                    },
+                    "mean_probability_abs_difference": sum(
+                        abs(small[key] - large[key]) for key in keys[:3]
+                    ) / 3.0,
+                    "paths_5000": {key: small[key] for key in keys},
+                    "paths_10000": {key: large[key] for key in keys},
+                })
+    diffs = sorted(x["mean_probability_abs_difference"] for x in comparisons)
+    p95_index = min(len(diffs) - 1, math.ceil(0.95 * len(diffs)) - 1) if diffs else None
     return {
         "comparisons": comparisons,
         "sample_count": len(comparisons),
+        "seed_bases": list(CONVERGENCE_SEEDS),
         "mean_abs_probability_difference": sum(diffs) / len(diffs) if diffs else None,
+        "p95_abs_probability_difference": diffs[p95_index] if p95_index is not None else None,
         "max_abs_probability_difference": max(diffs) if diffs else None,
-        "interpretation": "Monte Carlo sampling sensitivity only; not forecast accuracy.",
+        "interpretation": "Monte Carlo sampling sensitivity across repeated seeds; not forecast accuracy.",
     }
+
+
+def cross_provider_check(yahoo_rows):
+    """Compare overlapping daily returns with Stooq; do not mix price bases."""
+    url = "https://stooq.com/q/d/l/?s=spy.us&i=d"
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "200k-future-simulation-provider-check/1.0"}
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            raw = response.read().decode("utf-8-sig")
+        reader = csv.DictReader(raw.splitlines())
+        stooq = {}
+        for row in reader:
+            date, close_text = row.get("Date"), row.get("Close")
+            if not date or not close_text:
+                continue
+            close = float(close_text)
+            if close > 0:
+                stooq[date] = close
+        yahoo = {date: float(close) for date, close in yahoo_rows}
+        overlap = sorted(set(yahoo) & set(stooq))
+        yahoo_returns, stooq_returns = [], []
+        for previous, current in zip(overlap, overlap[1:]):
+            yahoo_returns.append(math.log(yahoo[current] / yahoo[previous]))
+            stooq_returns.append(math.log(stooq[current] / stooq[previous]))
+        if len(yahoo_returns) < 100:
+            return {
+                "status": "insufficient_overlap",
+                "overlapping_return_observations": len(yahoo_returns),
+                "source_url": url,
+                "note": "Stooq close-price basis is not assumed dividend-adjusted; diagnostic only.",
+            }
+        return {
+            "status": "completed",
+            "overlapping_return_observations": len(yahoo_returns),
+            "pearson_daily_return_correlation": statistics.correlation(yahoo_returns, stooq_returns),
+            "daily_return_sign_agreement": sum(
+                (a >= 0) == (b >= 0) for a, b in zip(yahoo_returns, stooq_returns)
+            ) / len(yahoo_returns),
+            "median_absolute_daily_log_return_difference": statistics.median(
+                abs(a - b) for a, b in zip(yahoo_returns, stooq_returns)
+            ),
+            "source_url": url,
+            "note": "Stooq close-price basis is not assumed dividend-adjusted; compare returns only, not price levels or calibration scores.",
+        }
+    except Exception as exc:
+        return {
+            "status": "unavailable",
+            "source_url": url,
+            "error_type": type(exc).__name__,
+            "note": "Independent-provider cross-check did not complete; no vendor-independence claim is made.",
+        }
 
 
 def main():
@@ -239,8 +304,10 @@ def main():
         parser.error("paths and convergence sample count must be positive")
 
     datasets = {}
+    raw_rows_by_symbol = {}
     for symbol, market in SYMBOLS.items():
         raw, rows, source_url = fetch_adjusted_close(symbol)
+        raw_rows_by_symbol[symbol] = rows
         datasets[symbol] = {
             "market": market,
             "source_url": source_url,
@@ -284,6 +351,7 @@ def main():
             "oos_paths_per_origin": args.paths,
             "convergence_path_counts": [5000, 10000],
             "convergence_samples_per_fold_per_instrument": args.convergence_samples_per_fold,
+            "convergence_random_seeds": list(CONVERGENCE_SEEDS),
             "symbols": SYMBOLS,
             "folds": FOLDS,
             "estimation_window_observations": ESTIMATION,
@@ -298,6 +366,11 @@ def main():
             "default_changed": False,
         },
         "datasets": datasets,
+        "independent_provider_crosscheck": {
+            "instrument": "SPY",
+            "provider": "Stooq daily close",
+            "result": cross_provider_check(raw_rows_by_symbol["SPY"]),
+        },
         "combined_oos_by_gate": combined,
         "decision": "No default recommendation is made automatically; review cross-market and cross-period consistency, sample sizes, source caveats, and path-count sensitivity.",
         "limitations": [
