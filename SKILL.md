@@ -59,3 +59,10 @@ GBM assumes constant parameters and lognormal increments. It does not inherently
 
 ## v2.3.0 compatibility note
 Historical simulations now use corrected drift by default. The legacy convention reproduces the prior v2.2.0 parameterization. Walk-forward scores can change after this correction and should be re-evaluated. The walk-forward diagnostic defaults to a rolling 252-observation estimation window and reports a causal empirical baseline, a leakage-safe probability blend and Brier skill score; configure the estimation and calibration windows for the actual bar interval. The optional `min_calibration_improvement` gate can require a minimum relative Brier improvement on matured calibration history before applying a non-zero raw-model blend; the default 0.0 preserves existing behavior. Neither convention establishes profitability.
+
+
+## Multi-market data workflow
+Use `engine.dataset_manifest.DatasetManifest` to declare each instrument's asset class, source, currency, bar interval, timezone, calendar and adjustment basis. Intraday/tick inputs must declare `periods_per_year`; do not assume the same annualization across equity sessions, FX, and 24x7 crypto.
+Use `engine.canonical_data` to map and validate provider rows. Validation never repairs data. Interval gaps may be warnings when exchange calendars or session breaks are not independently available.
+Optional provider adapters are in `engine.providers`: CSV, Yahoo Finance chart and Stooq daily. Keep provider failures and source provenance explicit.
+For reproducible multi-instrument evaluation, use `scripts/evaluate_dataset_manifest_oos.py`. It reports each dataset separately; do not combine the outputs into one universal accuracy score. A successful input audit is not evidence of predictive accuracy.
