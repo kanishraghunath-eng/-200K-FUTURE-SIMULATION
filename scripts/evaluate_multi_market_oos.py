@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import statistics
 import time
 import urllib.error
@@ -105,11 +106,60 @@ def fetch_adjusted_close(symbol):
     raise RuntimeError(f"{symbol}: data download failed: {last_error}")
 
 
-def score_rows(rows):
+def block_bootstrap_skill_interval(rows, block_length=HORIZON, replicates=2000, seed=7):
+    """Circular moving-block bootstrap for paired Brier skill differences.
+
+    Blocks preserve short-range dependence from overlapping forecast horizons.
+    This is exploratory uncertainty, not a confirmatory p-value.
+    """
+    n = len(rows)
+    if n < max(20, 4 * block_length):
+        return {"status": "insufficient_sample", "block_length": block_length}
+    differences = [float(x["baseline_brier_score"]) - float(x["brier_score"])
+                   for x in rows]
+    baselines = [float(x["baseline_brier_score"]) for x in rows]
+    observed_difference = sum(differences) / n
+    observed_baseline = sum(baselines) / n
+    if observed_baseline <= 0:
+        return {"status": "invalid_baseline", "block_length": block_length}
+
+    rng = random.Random(seed)
+    blocks_per_sample = math.ceil(n / block_length)
+    skill_samples = []
+    null_tail = 0
+    for _ in range(replicates):
+        indices = []
+        for _ in range(blocks_per_sample):
+            start = rng.randrange(n)
+            indices.extend((start + offset) % n for offset in range(block_length))
+        indices = indices[:n]
+        mean_difference = sum(differences[i] for i in indices) / n
+        mean_baseline = sum(baselines[i] for i in indices) / n
+        if mean_baseline > 0:
+            skill_samples.append(mean_difference / mean_baseline)
+        if mean_difference <= 0:
+            null_tail += 1
+
+    skill_samples.sort()
+    if not skill_samples:
+        return {"status": "bootstrap_failed", "block_length": block_length}
+    low = skill_samples[int(0.025 * (len(skill_samples) - 1))]
+    high = skill_samples[int(0.975 * (len(skill_samples) - 1))]
+    return {
+        "status": "estimated",
+        "block_length": block_length,
+        "replicates": len(skill_samples),
+        "brier_skill_ci_95": [low, high],
+        "one_sided_bootstrap_p_value": (null_tail + 1) / (replicates + 1),
+        "interpretation": "Circular moving-block bootstrap; exploratory and not adjusted for multiple comparisons.",
+    }
+
+
+def score_rows(rows, bootstrap=False, bootstrap_seed=7):
     if not rows:
         raise ValueError("cannot score an empty OOS sample")
     n = len(rows)
-    return {
+    result = {
         "oos_forecasts": n,
         "raw_brier": sum(x["raw_brier_score"] for x in rows) / n,
         "baseline_brier": sum(x["baseline_brier_score"] for x in rows) / n,
@@ -124,6 +174,32 @@ def score_rows(rows):
             for a in sorted({x["calibration_alpha"] for x in rows})
         },
     }
+    if bootstrap:
+        result["block_bootstrap"] = block_bootstrap_skill_interval(
+            rows, block_length=HORIZON, replicates=2000, seed=bootstrap_seed
+        )
+    return result
+
+
+def apply_holm_adjustment(datasets):
+    """Apply Holm family-wise adjustment to per-instrument/per-gate bootstrap p-values."""
+    tests = []
+    for symbol, item in datasets.items():
+        for gate, score in item["oos_validation"]["aggregate_oos_by_gate"].items():
+            boot = score.get("block_bootstrap", {})
+            p_value = boot.get("one_sided_bootstrap_p_value")
+            if p_value is not None:
+                tests.append((float(p_value), symbol, gate))
+    tests.sort(key=lambda item: item[0])
+    family_size = len(tests)
+    running_max = 0.0
+    for rank, (p_value, symbol, gate) in enumerate(tests):
+        adjusted = min(1.0, (family_size - rank) * p_value)
+        running_max = max(running_max, adjusted)
+        score = datasets[symbol]["oos_validation"]["aggregate_oos_by_gate"][gate]
+        score["block_bootstrap"]["holm_adjusted_p_value"] = running_max
+        score["block_bootstrap"]["holm_family_size"] = family_size
+        score["block_bootstrap"]["holm_family"] = "all instrument x calibration-gate comparisons in this study"
 
 
 def evaluate_oos(dataset_rows, paths):
@@ -173,7 +249,10 @@ def evaluate_oos(dataset_rows, paths):
         })
 
     aggregate = {
-        gate: score_rows(rows) if rows else {"status": "no OOS forecasts"}
+        gate: score_rows(
+            rows, bootstrap=True,
+            bootstrap_seed=7 + sum((i + 1) * ord(ch) for i, ch in enumerate(str(gate)))
+        ) if rows else {"status": "no OOS forecasts"}
         for gate, rows in by_gate.items()
     }
     return {"folds": fold_results, "aggregate_oos_by_gate": aggregate, "skipped": skipped}
@@ -343,6 +422,9 @@ def main():
             "brier_skill_vs_baseline": 1.0 - calibrated / baseline if baseline > 0 else None,
         }
 
+    # Correct for the family of instrument x calibration-gate comparisons.
+    apply_holm_adjustment(datasets)
+
     # VTI is in EODHD documented demo coverage; compare independent adjusted-return series.
     try:
         _, yahoo_vti_rows, yahoo_vti_url = fetch_adjusted_close("VTI")
@@ -371,6 +453,8 @@ def main():
             "target_barrier": TARGET,
             "stop_barrier": STOP,
             "calibration_gates": list(GATES),
+            "uncertainty_method": "2,000-replicate circular moving-block bootstrap; block length equals the 5-observation label horizon",
+            "multiple_comparison_method": "Holm adjustment across all instrument x calibration-gate comparisons",
             "oos_scoring_rule": "Only forecasts after the 252-observation estimation and 110-observation calibration warm-up are scored; each forecast uses only prior matured outcomes.",
             "default_changed": False,
         },
