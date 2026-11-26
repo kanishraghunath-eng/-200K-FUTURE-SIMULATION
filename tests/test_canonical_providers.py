@@ -196,6 +196,27 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(actions["split_count"], 1)
         self.assertEqual(len(actions["sha256"]), 64)
 
+    def test_eodhd_fetches_dividend_and_split_histories_without_exposing_token(self):
+        import json
+        responses = [
+            FakeResponse(json.dumps([{
+                "date": "2026-01-06", "unadjustedValue": 1.0, "currency": "USD"
+            }]).encode()),
+            FakeResponse(json.dumps([{
+                "date": "2026-01-06", "split": "4.000000/1.000000"
+            }]).encode()),
+        ]
+        with patch.dict("os.environ", {"EODHD_API_TOKEN": "test-secret"}):
+            with patch("urllib.request.urlopen", side_effect=responses) as mocked:
+                result = EodhdProvider().fetch_corporate_actions(
+                    manifest(), start="2026-01-01", end="2026-01-31",
+                    symbol="SPY.US",
+                )
+        self.assertEqual(len(result["div"]["events"]), 1)
+        self.assertEqual(len(result["splits"]["events"]), 1)
+        self.assertNotIn("test-secret", result["div"]["source"])
+        self.assertIn("api_token=test-secret", mocked.call_args_list[0].args[0].full_url)
+
     def test_corporate_action_reconciliation_matches_events_and_detects_mismatch(self):
         yahoo = {"events": [
             {"date": "2026-01-06", "type": "dividends", "amount": 1.0},
