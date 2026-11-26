@@ -92,6 +92,7 @@ class ConfirmatoryOOSTests(unittest.TestCase):
             adjustment_basis="provider_adjusted",
             corporate_actions_provider="eodhd",
         )
+        item.pop("corporate_actions_applicability", None)
         data = evaluated(
             ["2026-11-27T00:00:00+00:00"],
             [{"index": 0, "brier_score": 0.3, "baseline_brier_score": 0.5}],
