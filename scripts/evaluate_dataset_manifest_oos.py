@@ -49,12 +49,25 @@ def evaluate_dataset(item, paths=1000):
     corporate_action_payload = fetched.get("corporate_actions")
     if item.get("corporate_actions_provider") == "eodhd":
         try:
+            reference_actions = corporate_action_payload
+            reference_source = fetched.get("source")
+            if reference_actions is None:
+                reference_data = YahooFinanceChartProvider(
+                    include_ohlcv=False
+                ).fetch(manifest, item.get("actions_start", item.get("start")),
+                        item.get("end"))
+                reference_actions = reference_data.get("corporate_actions")
+                reference_source = reference_data.get("source")
             independent_actions = EodhdProvider().fetch_corporate_actions(
                 manifest, item.get("actions_start", item.get("start")),
-                item.get("end")
+                item.get("end"), symbol=item.get("corporate_actions_symbol")
             )
             corporate_action_audit = reconcile_corporate_actions(
-                corporate_action_payload, independent_actions
+                reference_actions, independent_actions
+            )
+            corporate_action_audit["reference_source"] = reference_source
+            corporate_action_audit["reference_events_sha256"] = (
+                reference_actions.get("sha256") if reference_actions else None
             )
             corporate_action_audit["independent_source_hashes"] = {
                 name: value["sha256"] for name, value in independent_actions.items()
