@@ -10,7 +10,7 @@
       "periods_per_year": 252,
       "timezone": "Asia/Kolkata",
       "calendar": "NSE",
-      "adjustment_basis": "unknown",
+      "adjustment_basis": "not_applicable",
       "corporate_actions_reviewed": false,
       "provider": "yahoo",
       "price_field": "close",
@@ -18,7 +18,8 @@
       "min_train": 252,
       "estimation_window": 252,
       "corporate_actions_applicability": "not_applicable",
-      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index."
+      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index.",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "^GSPC",
@@ -29,7 +30,7 @@
       "periods_per_year": 252,
       "timezone": "America/New_York",
       "calendar": "NYSE",
-      "adjustment_basis": "unknown",
+      "adjustment_basis": "not_applicable",
       "corporate_actions_reviewed": false,
       "provider": "yahoo",
       "price_field": "close",
@@ -37,7 +38,8 @@
       "min_train": 252,
       "estimation_window": 252,
       "corporate_actions_applicability": "not_applicable",
-      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index."
+      "corporate_actions_evidence": "Price-index series; constituent cash distributions are not directly included. Do not treat this as a total-return index.",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "EURUSD=X",
@@ -58,7 +60,8 @@
       "include_ohlcv": false,
       "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed.",
       "corporate_actions_applicability": "not_applicable",
-      "corporate_actions_evidence": "FX spot pair; issuer dividend/split actions are not applicable to the quoted pair."
+      "corporate_actions_evidence": "FX spot pair; issuer dividend/split actions are not applicable to the quoted pair.",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "BTC-USD",
@@ -77,7 +80,8 @@
       "min_train": 252,
       "estimation_window": 252,
       "corporate_actions_applicability": "not_applicable",
-      "corporate_actions_evidence": "Spot crypto pair; issuer dividend/split actions are not applicable."
+      "corporate_actions_evidence": "Spot crypto pair; issuer dividend/split actions are not applicable.",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "GC=F",
@@ -99,28 +103,31 @@
       "include_ohlcv": false,
       "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed.",
       "corporate_actions_applicability": "not_applicable",
-      "corporate_actions_evidence": "Futures contract chain; roll/contract adjustments are audited separately."
+      "corporate_actions_evidence": "Futures contract chain; roll/contract adjustments are audited separately.",
+      "confirmatory_candidate": false,
+      "confirmatory_block_reason": "Vendor continuous-futures ticker only; contract-level chain and independently verified roll rule are unavailable."
     },
     {
       "instrument_id": "TLT",
       "asset_class": "etf",
-      "source": "Yahoo Finance chart",
+      "source": "EODHD daily EOD adjusted close",
       "currency": "USD",
       "interval": "daily",
       "periods_per_year": 252,
       "timezone": "America/New_York",
       "calendar": "NASDAQ",
-      "adjustment_basis": "unknown",
+      "adjustment_basis": "provider_adjusted",
       "corporate_actions_reviewed": false,
-      "provider": "yahoo",
-      "price_field": "close",
+      "provider": "eodhd",
+      "price_field": "adjusted_close",
       "horizon": 5,
       "min_train": 252,
       "estimation_window": 252,
       "corporate_actions_provider": "eodhd",
       "corporate_actions_symbol": "TLT.US",
       "actions_start": "2002-07-01",
-      "corporate_actions_reference_interval": "daily"
+      "corporate_actions_reference_interval": "daily",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "spy.us",
@@ -141,7 +148,9 @@
       "corporate_actions_provider": "eodhd",
       "corporate_actions_symbol": "SPY.US",
       "actions_start": "1993-01-29",
-      "corporate_actions_reference_interval": "daily"
+      "corporate_actions_reference_interval": "daily",
+      "confirmatory_candidate": false,
+      "confirmatory_block_reason": "Stooq raw close is provider-crosscheck material only; dividend-adjusted series required for confirmatory ETF OOS."
     },
     {
       "instrument_id": "VTI.US",
@@ -162,7 +171,8 @@
       "corporate_actions_provider": "eodhd",
       "corporate_actions_symbol": "VTI.US",
       "actions_start": "2001-05-24",
-      "corporate_actions_reference_interval": "daily"
+      "corporate_actions_reference_interval": "daily",
+      "confirmatory_candidate": true
     },
     {
       "instrument_id": "SPY",
@@ -186,7 +196,30 @@
       "corporate_actions_provider": "eodhd",
       "corporate_actions_symbol": "SPY.US",
       "actions_start": "2025-01-01",
-      "corporate_actions_reference_interval": "daily"
+      "corporate_actions_reference_interval": "daily",
+      "confirmatory_candidate": false,
+      "confirmatory_block_reason": "Intraday raw ETF close lacks an independently verified distribution-adjusted hourly series."
+    },
+    {
+      "instrument_id": "XAUUSD=X",
+      "asset_class": "commodity_spot",
+      "source": "Yahoo Finance chart spot gold proxy",
+      "currency": "USD",
+      "interval": "daily",
+      "periods_per_year": 252,
+      "timezone": "UTC",
+      "calendar": "global OTC metals session",
+      "adjustment_basis": "not_applicable",
+      "corporate_actions_reviewed": false,
+      "corporate_actions_applicability": "not_applicable",
+      "corporate_actions_evidence": "Spot commodity reference series; futures contract roll is not applicable.",
+      "provider": "yahoo",
+      "price_field": "close",
+      "horizon": 5,
+      "min_train": 252,
+      "estimation_window": 252,
+      "confirmatory_candidate": true,
+      "notes": "Spot gold proxy added separately from GC=F; it does not validate futures roll construction."
     }
   ]
 }
