@@ -124,13 +124,20 @@ def evaluate_dataset(item, paths=1000):
         return dict(base, status="insufficient_data", observations=len(prices),
                     required_observations=max(required, 70))
     diagnostic = walk_forward_barrier_diagnostic(
-        prices, horizon=horizon, min_train=min_train, paths=paths,
+        prices, horizon=horizon, target_pct=float(item.get("target_pct", 0.03)),
+        stop_pct=float(item.get("stop_pct", 0.02)),
+        min_train=min_train, paths=paths,
+        seed=int(item.get("seed", 7)),
         estimation_window=estimation_window,
+        calibration_window=int(item.get("calibration_window", 252)),
+        min_calibration_observations=int(item.get("min_calibration_observations", 100)),
+        min_calibration_improvement=float(item.get("min_calibration_improvement", 0.0)),
         periods_per_year=manifest.effective_periods_per_year,
         step_year_fraction=float(item.get("step_year_fraction",
                                           1.0 / manifest.effective_periods_per_year)),
     )
     return dict(base, status="evaluated", observations=len(prices),
+                observation_timestamps=[row["timestamp"] for row in fetched["rows"]],
                 oos_diagnostic=diagnostic,
                 limitations=["close-only barrier labels", "GBM assumptions",
                               "not a profitability test", "calendar and adjustment metadata require source review"])
