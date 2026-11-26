@@ -23,6 +23,9 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 ## Optional external-provider cross-check
 The core simulation engine and CSV-based workflow do not require a Stooq account, Stooq API key, or any external provider credential. The optional multi-market research script can attempt a separate Stooq comparison when `STOOQ_API_KEY` is configured. If it is not configured or Stooq cannot provide valid data, record `api_key_required` or another explicit unavailable status and continue the simulation/OOS evaluation. Never describe the provider comparison as completed unless valid overlapping return observations were actually compared.
 
+## Validation tooling
+Use `scripts/evaluate_multi_market_oos.py` for held-out multi-market diagnostics and the Yahoo/EODHD VTI adjusted-return comparison. The provider check is complete only when at least 100 matched return intervals are actually compared; otherwise report the exact non-success status. Use `scripts/benchmark_200k.py` for a separate streamed 200K-path performance and sampling-convergence study. Its synthetic input is for engine benchmarking only, not market prediction validation.
+
 ## Workflow
 1. Define instrument, market, timeframe, forecast horizon and analysis question.
 2. Load CSV using engine.data_io.load_price_csv; review timestamp order, duplicates, price values, interval gaps, currency and corporate-action status.
