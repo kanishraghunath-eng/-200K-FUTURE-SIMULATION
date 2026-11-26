@@ -32,6 +32,12 @@ Reusable platform-neutral skill instructions plus a Python scenario-analysis eng
 - Added dependency-free JSON report generation.
 - Preserved the original full-path API as the default.
 
+## Independent provider cross-check
+The multi-market validation now compares Yahoo Finance and EODHD adjusted-close daily returns for VTI. EODHD documents a no-signup demo token for a limited ticker set that includes VTI.US. The report requires at least 100 overlapping return intervals before marking the comparison `completed`; otherwise it records an explicit unavailable, denied, invalid, or insufficient-overlap status. This is a data-source consistency diagnostic, not proof that either vendor is correct.
+
+## Dedicated 200K performance and convergence study
+Run `python scripts/benchmark_200k.py --output 200k_benchmark_report.json` to measure streamed-summary performance at 200,000 paths for 5, 21, and 252 steps, and compare 5K/10K/50K estimates with 200K references across three seeds. The benchmark uses deterministic synthetic prices to isolate compute cost. It reports elapsed time, throughput, process peak RSS and probability sampling differences. It does not validate market forecast accuracy or profitability.
+
 ## Optional Stooq provider cross-check
 The simulation engine, CSV input workflow, and ordinary tests do **not** need a Stooq API key or any provider credential. The multi-market OOS workflow also continues when `STOOQ_API_KEY` is absent: its report records `api_key_required` for the optional SPY/Stooq comparison, while the Yahoo-based OOS and Monte Carlo stability diagnostics still run. Configure the `STOOQ_API_KEY` GitHub Actions repository secret only if you separately want to attempt that provider comparison. A missing or rejected key must never be represented as a successful independent-provider validation.
 
