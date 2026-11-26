@@ -1,10 +1,11 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import canonicalize_rows, validate_canonical_rows
-from engine.providers import CsvProvider, ProviderRegistry
+from engine.providers import (CsvProvider, ProviderRegistry, YahooFinanceChartProvider, StooqCsvProvider)
 from scripts.evaluate_dataset_manifest_oos import evaluate_dataset
 
 
@@ -57,6 +58,18 @@ class CanonicalValidationTests(unittest.TestCase):
         self.assertFalse(validate_canonical_rows(rows,manifest())["valid"])
 
 
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body
+        self.status = 200
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        return False
+    def read(self):
+        return self.body
+
+
 class ProviderTests(unittest.TestCase):
     def test_csv_provider_registry(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,6 +83,29 @@ class ProviderTests(unittest.TestCase):
             registry.register(provider)
             self.assertEqual(registry.names(),("csv",))
             self.assertIs(registry.get("csv"),provider)
+
+    def test_yahoo_provider_maps_chart_payload(self):
+        import json
+        import datetime
+        stamps = [int(datetime.datetime(2026, 1, d, tzinfo=datetime.timezone.utc).timestamp())
+                  for d in (5, 6, 7)]
+        payload = {"chart":{"result":[{"timestamp":stamps,
+                   "indicators":{"quote":[{"close":[100,101,99]}]}}],"error":None}}
+        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+            result = YahooFinanceChartProvider().fetch(manifest())
+        self.assertEqual(result["provider"], "yahoo")
+        self.assertEqual([float(x["close"]) for x in result["rows"]], [100,101,99])
+
+    def test_stooq_provider_maps_daily_csv(self):
+        body = b"Date,Open,High,Low,Close,Volume\\n2026-01-05,100,101,99,100,10\\n2026-01-06,101,102,100,101,11\\n2026-01-07,99,100,98,99,12\\n"
+        with patch("urllib.request.urlopen", return_value=FakeResponse(body)):
+            result = StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
+        self.assertEqual(result["provider"], "stooq")
+        self.assertEqual(len(result["rows"]), 3)
+
+    def test_stooq_rejects_adjusted_close_request(self):
+        with self.assertRaisesRegex(ValueError, "raw close"):
+            StooqCsvProvider().fetch(manifest(price_field="adjusted_close"))
 
     def test_manifest_runner_labels_short_history_insufficient(self):
         with tempfile.TemporaryDirectory() as tmp:
