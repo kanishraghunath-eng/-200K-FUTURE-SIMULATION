@@ -23,12 +23,16 @@ def canonicalize_rows(rows, timestamp_column="date", close_column="close",
     for number, row in enumerate(rows, 1):
         if timestamp_column not in row or close_column not in row:
             raise ValueError(f"missing configured timestamp/close column at row {number}")
-        output.append({
+        canonical = {
             "timestamp": row[timestamp_column],
             "close": row[close_column],
             "currency": row.get("currency", currency),
             "price_basis": row.get("price_basis", price_basis),
-        })
+        }
+        for field in ("open", "high", "low", "volume"):
+            if row.get(field) not in (None, ""):
+                canonical[field] = row[field]
+        output.append(canonical)
     return output
 
 
@@ -60,6 +64,26 @@ def validate_canonical_rows(rows, manifest, require_timezone=False):
             errors.append({"code": "currency_mismatch", "row": i})
         if row.get("price_basis") not in (None, manifest.price_field):
             errors.append({"code": "price_basis_mismatch", "row": i})
+        ohlc_fields = ("open", "high", "low")
+        present_ohlc = [field for field in ohlc_fields if row.get(field) not in (None, "")]
+        if present_ohlc and len(present_ohlc) != 3:
+            errors.append({"code": "incomplete_ohlc", "row": i})
+        elif len(present_ohlc) == 3 and closes[-1] is not None:
+            try:
+                o, h, low = (float(row[field]) for field in ohlc_fields)
+                if not all(math.isfinite(x) and x > 0 for x in (o, h, low)):
+                    raise ValueError
+                if h < max(o, low, closes[-1]) or low > min(o, h, closes[-1]):
+                    errors.append({"code": "inconsistent_ohlc_range", "row": i})
+            except (TypeError, ValueError):
+                errors.append({"code": "invalid_ohlc", "row": i})
+        if row.get("volume") not in (None, ""):
+            try:
+                volume = float(row["volume"])
+                if not math.isfinite(volume) or volume < 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append({"code": "invalid_volume", "row": i})
     valid_stamps = [(i, stamp) for i, stamp in enumerate(stamps, 1) if stamp is not None]
     awareness = {stamp.utcoffset() is not None for _, stamp in valid_stamps}
     if len(awareness) > 1:
