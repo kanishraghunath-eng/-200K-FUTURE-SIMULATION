@@ -5,6 +5,7 @@ simulation engine to a vendor SDK or API credential.
 """
 from abc import ABC, abstractmethod
 import csv
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 import json
@@ -42,12 +43,16 @@ class CsvProvider(PriceDataProvider):
         if end is not None:
             rows = [r for r in rows if r["timestamp"] <= end]
         return {"provider": self.name, "source": str(self.path),
+                "source_sha256": hashlib.sha256(self.path.read_bytes()).hexdigest(),
                 "raw_observations": len(raw), "rows": rows}
 
 
 class YahooFinanceChartProvider(PriceDataProvider):
     """Public Yahoo chart endpoint adapter; availability/rate limits are external."""
     name = "yahoo"
+
+    def __init__(self, include_ohlcv=True):
+        self.include_ohlcv = bool(include_ohlcv)
 
     def fetch(self, dataset, start=None, end=None):
         interval_map = {"daily": "1d", "weekly": "1wk", "monthly": "1mo",
@@ -91,7 +96,7 @@ class YahooFinanceChartProvider(PriceDataProvider):
             row = {"timestamp": datetime.fromtimestamp(stamp, timezone.utc).isoformat(),
                    "close": value, "currency": dataset.currency,
                    "price_basis": dataset.price_field}
-            if not adjusted:
+            if not adjusted and self.include_ohlcv:
                 for field in ("open", "high", "low", "volume"):
                     series = quote.get(field)
                     if series and index < len(series) and series[index] is not None:
@@ -100,7 +105,10 @@ class YahooFinanceChartProvider(PriceDataProvider):
         if len(rows) < 3:
             raise RuntimeError("Yahoo returned fewer than three usable observations")
         return {"provider": self.name, "source": url, "raw_observations": len(stamps),
-                "provider_price_basis": basis, "rows": rows}
+                "source_sha256": hashlib.sha256(raw).hexdigest(),
+                "provider_price_basis": basis,
+                "ohlcv_included": bool(not adjusted and self.include_ohlcv),
+                "rows": rows}
 
 
 class StooqCsvProvider(PriceDataProvider):
@@ -120,7 +128,8 @@ class StooqCsvProvider(PriceDataProvider):
         url = "https://stooq.com/q/d/l/?" + urllib.parse.urlencode(params)
         request = urllib.request.Request(url, headers={"User-Agent": "200k-future-simulation/2.3"})
         with urllib.request.urlopen(request, timeout=45) as response:
-            raw = response.read().decode("utf-8-sig")
+            raw_bytes = response.read()
+        raw = raw_bytes.decode("utf-8-sig")
         import csv as _csv
         from io import StringIO
         source_rows = list(_csv.DictReader(StringIO(raw)))
@@ -137,6 +146,7 @@ class StooqCsvProvider(PriceDataProvider):
         if len(rows) < 3:
             raise RuntimeError("Stooq returned fewer than three usable observations")
         return {"provider": self.name, "source": url,
+                "source_sha256": hashlib.sha256(raw_bytes).hexdigest(),
                 "raw_observations": len(source_rows), "rows": rows}
 
 
@@ -179,6 +189,7 @@ class EodhdProvider(PriceDataProvider):
         if len(rows) < 3:
             raise RuntimeError("EODHD returned fewer than three usable observations")
         return {"provider": self.name, "source": url,
+                "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "raw_observations": len(payload), "rows": rows}
 
 
