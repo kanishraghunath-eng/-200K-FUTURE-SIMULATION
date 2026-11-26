@@ -97,7 +97,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual([float(x["close"]) for x in result["rows"]], [100,101,99])
 
     def test_stooq_provider_maps_daily_csv(self):
-        body = b"Date,Open,High,Low,Close,Volume\\n2026-01-05,100,101,99,100,10\\n2026-01-06,101,102,100,101,11\\n2026-01-07,99,100,98,99,12\\n"
+        body = b"Date,Open,High,Low,Close,Volume\n2026-01-05,100,101,99,100,10\n2026-01-06,101,102,100,101,11\n2026-01-07,99,100,98,99,12\n"
         with patch("urllib.request.urlopen", return_value=FakeResponse(body)):
             result = StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
         self.assertEqual(result["provider"], "stooq")
