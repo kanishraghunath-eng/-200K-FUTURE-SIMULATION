@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import validate_canonical_rows
-from engine.providers import CsvProvider
+from engine.providers import CsvProvider, YahooFinanceChartProvider, StooqCsvProvider
 from engine.backtest import walk_forward_barrier_diagnostic
 
 
@@ -26,12 +26,23 @@ def evaluate_dataset(item, paths=1000):
     metadata_fields.update({key: item[key] for key in optional if key in item})
     manifest = DatasetManifest(**metadata_fields)
     manifest.validate()
-    provider = CsvProvider(item["path"], item.get("timestamp_column", "date"),
-                           item.get("close_column", "close"))
+    provider_name = item.get("provider", "csv")
+    if provider_name == "csv":
+        provider = CsvProvider(item["path"], item.get("timestamp_column", "date"),
+                               item.get("close_column", "close"))
+    elif provider_name == "yahoo":
+        provider = YahooFinanceChartProvider()
+    elif provider_name == "stooq":
+        provider = StooqCsvProvider()
+    else:
+        raise ValueError(f"unsupported provider: {provider_name}")
     fetched = provider.fetch(manifest, item.get("start"), item.get("end"))
     audit = validate_canonical_rows(fetched["rows"], manifest,
                                     require_timezone=bool(item.get("require_timezone", False)))
-    raw = Path(item["path"]).read_bytes()
+    if provider_name == "csv":
+        raw = Path(item["path"]).read_bytes()
+    else:
+        raw = json.dumps(fetched["rows"], sort_keys=True, separators=(",", ":")).encode("utf-8")
     base = {
         "instrument_id": manifest.instrument_id, "asset_class": manifest.asset_class,
         "source": fetched["source"], "provider": fetched["provider"],
