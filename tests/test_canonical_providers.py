@@ -151,10 +151,25 @@ class ProviderTests(unittest.TestCase):
 
     def test_stooq_provider_maps_daily_csv(self):
         body = b"Date,Open,High,Low,Close,Volume\n2026-01-05,100,101,99,100,10\n2026-01-06,101,102,100,101,11\n2026-01-07,99,100,98,99,12\n"
-        with patch("urllib.request.urlopen", return_value=FakeResponse(body)):
-            result = StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
+        with patch.dict("os.environ", {"STOOQ_API_KEY": "test-secret"}):
+            with patch("urllib.request.urlopen", return_value=FakeResponse(body)) as mocked:
+                result = StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
         self.assertEqual(result["provider"], "stooq")
         self.assertEqual(len(result["rows"]), 3)
+        self.assertNotIn("test-secret", result["source"])
+        self.assertIn("apikey=test-secret", mocked.call_args.args[0].full_url)
+
+    def test_stooq_requires_api_key_and_does_not_make_anonymous_request(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "requires an API key"):
+                StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
+
+    def test_stooq_detects_html_or_api_key_prompt_instead_of_misreporting_empty_csv(self):
+        body = b"<!doctype html><html><body>Get your API key</body></html>"
+        with patch.dict("os.environ", {"STOOQ_API_KEY": "test-secret"}):
+            with patch("urllib.request.urlopen", return_value=FakeResponse(body)):
+                with self.assertRaisesRegex(RuntimeError, "authentication, quota, or challenge"):
+                    StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
 
     def test_eodhd_provider_maps_adjusted_close(self):
         import json
