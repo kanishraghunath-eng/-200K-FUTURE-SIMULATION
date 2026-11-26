@@ -53,3 +53,37 @@ The GBM primitive accepts arithmetic drift mu and applies log increments `(mu - 
 
 ## Data audit
 `validate_dated_prices(..., collect_all_errors=True)` returns structured `errors` and `warnings`. `load_price_csv(..., collect_all_errors=True)` returns `prices=None` for invalid input. The default remains fail-fast for compatibility. A gap greater than three days is a warning when no strict calendar-daily interval is declared; this is not an exchange-calendar determination.
+
+
+## Multi-market data foundation (feature branch)
+- `engine/dataset_manifest.py` defines a validated instrument/dataset contract for equity, indices, ETFs, FX, commodities, crypto and other supported categories.
+- `periods_per_year` is explicit for intraday/tick datasets. Conservative defaults are provided for daily, weekly and monthly bars; crypto daily uses 365 while other daily families default to 252. Confirm the actual session convention before relying on annualized values.
+- `engine/canonical_data.py` maps provider fields to canonical timestamp/close/currency/price-basis rows and validates ordering, duplicates, timezone awareness when required, and interval consistency warnings without repairing input.
+- `engine/providers.py` provides a pluggable provider contract and CSV, Yahoo Finance chart, and Stooq daily adapters. External providers can rate-limit, change schemas or deny access; provider failures must remain explicit.
+- `scripts/evaluate_dataset_manifest_oos.py` evaluates each manifest dataset independently and writes per-instrument OOS diagnostics. Use real, provenance-documented datasets; synthetic fixtures test plumbing only.
+
+Example manifest item:
+```json
+{
+  "instrument_id": "NIFTY50",
+  "asset_class": "equity_index",
+  "source": "NSE daily historical data",
+  "currency": "INR",
+  "interval": "daily",
+  "timezone": "Asia/Kolkata",
+  "calendar": "NSE",
+  "adjustment_basis": "unknown",
+  "corporate_actions_reviewed": false,
+  "provider": "csv",
+  "path": "data/nifty50.csv",
+  "timestamp_column": "date",
+  "close_column": "close",
+  "horizon": 5,
+  "periods_per_year": 252
+}
+```
+
+Run per-dataset diagnostics:
+```bash
+python scripts/evaluate_dataset_manifest_oos.py --manifest datasets/manifest.json --paths 1000 --output dataset_oos_report.json
+```
