@@ -27,7 +27,7 @@ class DatasetManifestTests(unittest.TestCase):
     def test_valid_24x7_crypto_metadata(self):
         manifest = self.make_manifest(
             instrument_id="BTC-USD", asset_class="crypto",
-            currency="USD", interval="1h", timezone="UTC",
+            currency="USD", interval="1h", periods_per_year=8760, timezone="UTC",
             calendar=None, adjustment_basis="not_applicable")
         self.assertTrue(manifest.validate()["valid"])
 
