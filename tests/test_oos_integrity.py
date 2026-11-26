@@ -6,6 +6,7 @@ import numpy as np
 from engine.backtest import _barrier_class, walk_forward_barrier_diagnostic
 from engine.providers import YahooFinanceChartProvider
 from engine.dataset_manifest import DatasetManifest
+from scripts.analyze_manifest_oos_uncertainty import analyze_report
 from scripts.evaluate_multi_market_oos import (
     apply_holm_adjustment, block_bootstrap_skill_interval,
     selected_200k_market_convergence,
@@ -121,6 +122,53 @@ class StatisticalValidationTests(unittest.TestCase):
         self.assertEqual(first["brier_skill_ci_95"], second["brier_skill_ci_95"])
         self.assertGreater(first["brier_skill_ci_95"][0], 0.0)
         self.assertEqual(first["replicates"], 200)
+
+
+
+    def test_manifest_uncertainty_report_skips_failed_datasets_and_adjusts_p(self):
+        rows = []
+        for i in range(100):
+            baseline = 0.50 + (0.005 if i % 2 else -0.005)
+            rows.append({
+                "baseline_brier_score": baseline,
+                "brier_score": baseline - 0.02,
+            })
+        payload = {
+            "paths": 1000,
+            "datasets": [
+                {
+                    "instrument_id": "SYNTH",
+                    "asset_class": "equity_index",
+                    "provider": "fixture",
+                    "status": "evaluated",
+                    "manifest": {"interval": "daily"},
+                    "source_sha256": "a" * 64,
+                    "data_sha256": "b" * 64,
+                    "oos_diagnostic": {
+                        "rows": rows,
+                        "multiclass_brier_score": 0.48,
+                        "baseline_multiclass_brier_score": 0.50,
+                        "brier_skill_score": 0.04,
+                    },
+                },
+                {
+                    "instrument_id": "BROKEN",
+                    "asset_class": "etf",
+                    "provider": "fixture",
+                    "status": "provider_error",
+                    "error": "test provider error",
+                },
+            ],
+        }
+        report = analyze_report(payload, replicates=200, block_length=5, seed=9)
+        self.assertEqual(report["evaluated_instrument_count"], 1)
+        self.assertEqual(report["skipped_dataset_count"], 1)
+        result = report["results"][0]
+        self.assertEqual(result["instrument_id"], "SYNTH")
+        self.assertEqual(result["bootstrap"]["status"], "estimated")
+        self.assertEqual(result["bootstrap"]["holm_family_size"], 1)
+        self.assertEqual(len(result["bootstrap"]["brier_skill_ci_95"]), 2)
+        self.assertEqual(report["skipped_datasets"][0]["status"], "provider_error")
 
 
     def test_selected_200k_market_convergence_uses_fixed_realistic_origins(self):
