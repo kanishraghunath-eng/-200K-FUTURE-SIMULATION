@@ -8,7 +8,7 @@ import csv
 from pathlib import Path
 from datetime import datetime, timezone
 import json
-import time
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -120,6 +120,43 @@ class StooqCsvProvider(PriceDataProvider):
             raise RuntimeError("Stooq returned fewer than three usable observations")
         return {"provider": self.name, "source": url,
                 "raw_observations": len(source_rows), "rows": rows}
+
+
+class EodhdProvider(PriceDataProvider):
+    """EODHD daily EOD adapter; the public demo token has limited symbol coverage."""
+    name = "eodhd"
+
+    def fetch(self, dataset, start=None, end=None):
+        if dataset.interval != "daily":
+            raise ValueError("EODHD adapter currently supports daily data only")
+        if dataset.price_field not in {"close", "adjusted_close"}:
+            raise ValueError("EODHD adapter supports close or adjusted_close only")
+        token = os.environ.get("EODHD_API_TOKEN", "demo")
+        params = {"api_token": token, "period": "d", "fmt": "json"}
+        if start:
+            params["from"] = start[:10]
+        if end:
+            params["to"] = end[:10]
+        url = "https://eodhd.com/api/eod/" + urllib.parse.quote(dataset.instrument_id) + "?" + urllib.parse.urlencode(params)
+        request = urllib.request.Request(url, headers={"User-Agent": "200k-future-simulation/2.3",
+                                                       "Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=45) as response:
+            raw = response.read()
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, list):
+            raise RuntimeError("EODHD returned a non-list EOD payload")
+        rows = []
+        field = "adjusted_close" if dataset.price_field == "adjusted_close" else "close"
+        for item in payload:
+            value = item.get(field)
+            if value is None:
+                continue
+            rows.append({"timestamp": item.get("date"), "close": value,
+                         "currency": dataset.currency, "price_basis": dataset.price_field})
+        if len(rows) < 3:
+            raise RuntimeError("EODHD returned fewer than three usable observations")
+        return {"provider": self.name, "source": url,
+                "raw_observations": len(payload), "rows": rows}
 
 
 class ProviderRegistry:
