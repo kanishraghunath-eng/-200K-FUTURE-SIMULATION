@@ -7,6 +7,7 @@ on:
       - "engine/**"
       - "scripts/evaluate_multi_market_oos.py"
       - "scripts/evaluate_dataset_manifest_oos.py"
+      - "scripts/analyze_manifest_oos_uncertainty.py"
       - "engine/dataset_manifest.py"
       - "engine/canonical_data.py"
       - "engine/providers.py"
@@ -54,11 +55,27 @@ jobs:
             --paths 1000 \
             --output multi_asset_oos_report.json
 
+      - name: Analyze per-asset OOS statistical uncertainty
+        run: |
+          python scripts/analyze_manifest_oos_uncertainty.py \
+            --input multi_asset_oos_report.json \
+            --output multi_asset_oos_uncertainty.json \
+            --replicates 2000 \
+            --block-length 5
+
       - name: Upload per-asset validation report
         uses: actions/upload-artifact@v4
         with:
           name: multi-asset-oos-report
           path: multi_asset_oos_report.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload per-asset statistical uncertainty report
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-asset-oos-uncertainty-report
+          path: multi_asset_oos_uncertainty.json
           if-no-files-found: error
           retention-days: 30
 
