@@ -4,6 +4,7 @@ This runner deliberately does not download prices. Each dataset is evaluated
 independently; results are not pooled into a misleading universal score.
 """
 import argparse
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -52,9 +53,16 @@ def evaluate_dataset(item, paths=1000):
             reference_actions = corporate_action_payload
             reference_source = fetched.get("source")
             if reference_actions is None:
+                reference_manifest = manifest
+                reference_interval = item.get("corporate_actions_reference_interval")
+                if reference_interval and reference_interval != manifest.interval:
+                    reference_manifest = replace(
+                        manifest, interval=reference_interval,
+                        periods_per_year=252 if reference_interval == "daily" else manifest.periods_per_year,
+                    )
                 reference_data = YahooFinanceChartProvider(
                     include_ohlcv=False
-                ).fetch(manifest, item.get("actions_start", item.get("start")),
+                ).fetch(reference_manifest, item.get("actions_start", item.get("start")),
                         item.get("end"))
                 reference_actions = reference_data.get("corporate_actions")
                 reference_source = reference_data.get("source")
