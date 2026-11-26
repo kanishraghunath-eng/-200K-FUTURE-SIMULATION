@@ -55,6 +55,19 @@ class DatasetManifestTests(unittest.TestCase):
                 asset_class="commodity_future",
                 instrument_id="WTI-front-month").validate()
 
+    def test_intraday_requires_explicit_annualization(self):
+        with self.assertRaisesRegex(ValueError, "periods_per_year"):
+            self.make_manifest(interval="5m").validate()
+
+    def test_coarse_interval_annualization_defaults(self):
+        self.assertEqual(self.make_manifest(interval="weekly").effective_periods_per_year, 52)
+        self.assertEqual(self.make_manifest(interval="monthly").effective_periods_per_year, 12)
+        self.assertEqual(self.make_manifest(asset_class="crypto").effective_periods_per_year, 365)
+
+    def test_explicit_intraday_annualization(self):
+        item = self.make_manifest(interval="5m", periods_per_year=19656)
+        self.assertEqual(item.effective_periods_per_year, 19656)
+
     def test_manifest_serializes_after_validation(self):
         data = self.make_manifest().to_dict()
         self.assertEqual(data["currency"], "INR")
