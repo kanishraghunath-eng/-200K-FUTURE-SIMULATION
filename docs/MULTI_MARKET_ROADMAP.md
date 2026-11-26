@@ -147,3 +147,5 @@ The feature branch now contains the first implementation slice:
 - Unit tests cover metadata, canonical validation, CSV provider behavior, mocked Yahoo/Stooq/EODHD parsing, and insufficient-history handling.
 
 Important: these are implementation and plumbing milestones, not proof that every market family is validated. The hosted multi-asset OOS workflow is still running; final provider coverage and per-market metrics must be read from its artifact. Data-source availability, adjustment quality, exchange calendars, futures roll construction, and model fit remain independent review items.
+
+- The canonical schema now preserves optional OHLCV values and checks OHLC range consistency and finite non-negative volume; adjusted-close rows do not mix in raw OHLC.
