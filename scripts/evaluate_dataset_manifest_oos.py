@@ -19,7 +19,7 @@ from engine.providers import (CsvProvider, YahooFinanceChartProvider, StooqCsvPr
 from engine.backtest import walk_forward_barrier_diagnostic
 
 
-def evaluate_dataset(item, paths=1000):
+def evaluate_dataset(item, paths=1000, data_only=False):
     metadata_fields = {key: item[key] for key in (
         "instrument_id", "asset_class", "source", "currency", "interval")}
     optional = ("price_field", "timezone", "calendar", "adjustment_basis",
@@ -123,6 +123,12 @@ def evaluate_dataset(item, paths=1000):
     if len(prices) < max(required, 70):
         return dict(base, status="insufficient_data", observations=len(prices),
                     required_observations=max(required, 70))
+    if data_only:
+        return dict(
+            base, status="data_validated", observations=len(prices),
+            observation_timestamps=[row["timestamp"] for row in fetched["rows"]],
+            _prices=prices,
+        )
     diagnostic = walk_forward_barrier_diagnostic(
         prices, horizon=horizon, target_pct=float(item.get("target_pct", 0.03)),
         stop_pct=float(item.get("stop_pct", 0.02)),
