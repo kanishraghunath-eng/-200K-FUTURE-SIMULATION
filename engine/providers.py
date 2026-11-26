@@ -255,11 +255,12 @@ class EodhdProvider(PriceDataProvider):
                 "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "raw_observations": len(payload), "rows": rows}
 
-    def fetch_corporate_actions(self, dataset, start=None, end=None):
+    def fetch_corporate_actions(self, dataset, start=None, end=None, symbol=None):
         """Fetch EODHD dividend and split histories for independent reconciliation."""
-        token = os.environ.get("EODHD_API_TOKEN", "demo").strip()
+        token = os.environ.get("EODHD_API_TOKEN", "").strip()
         if not token:
             raise RuntimeError("EODHD_API_TOKEN is required for corporate-action reconciliation")
+        action_symbol = symbol or dataset.instrument_id
         result = {}
         for action_type in ("div", "splits"):
             params = {"api_token": token, "fmt": "json"}
@@ -269,7 +270,7 @@ class EodhdProvider(PriceDataProvider):
                 params["to"] = end[:10]
             url = (
                 "https://eodhd.com/api/" + action_type + "/"
-                + urllib.parse.quote(dataset.instrument_id)
+                + urllib.parse.quote(action_symbol)
                 + "?" + urllib.parse.urlencode(params)
             )
             request = urllib.request.Request(
