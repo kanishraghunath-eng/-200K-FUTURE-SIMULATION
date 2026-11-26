@@ -120,7 +120,13 @@ class StooqCsvProvider(PriceDataProvider):
             raise ValueError("Stooq adapter currently supports daily data only")
         if dataset.price_field != "close":
             raise ValueError("Stooq adapter supplies raw close only")
-        params = {"s": dataset.instrument_id.lower(), "i": "d"}
+        api_key = os.environ.get("STOOQ_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError(
+                "Stooq now requires an API key for historical CSV downloads; "
+                "configure STOOQ_API_KEY in the runtime secret store"
+            )
+        params = {"s": dataset.instrument_id.lower(), "i": "d", "apikey": api_key}
         if start:
             params["d1"] = start.replace("-", "")
         if end:
@@ -130,9 +136,22 @@ class StooqCsvProvider(PriceDataProvider):
         with urllib.request.urlopen(request, timeout=45) as response:
             raw_bytes = response.read()
         raw = raw_bytes.decode("utf-8-sig")
+        lowered = raw.lstrip().lower()
+        if ("get your apikey" in lowered or "api key" in lowered
+                or "daily hits limit" in lowered or "exceeded" in lowered
+                or lowered.startswith("<!doctype") or lowered.startswith("<html")):
+            raise RuntimeError(
+                "Stooq returned an authentication, quota, or challenge response; "
+                "verify STOOQ_API_KEY and provider access"
+            )
         import csv as _csv
         from io import StringIO
-        source_rows = list(_csv.DictReader(StringIO(raw)))
+        reader = _csv.DictReader(StringIO(raw))
+        if not reader.fieldnames or not {"Date", "Close"}.issubset(set(reader.fieldnames)):
+            raise RuntimeError(
+                "Stooq response is not the expected Date/Open/High/Low/Close/Volume CSV"
+            )
+        source_rows = list(reader)
         rows = []
         for source_row in source_rows:
             if not source_row.get("Date") or not source_row.get("Close"):
@@ -145,7 +164,14 @@ class StooqCsvProvider(PriceDataProvider):
             rows.append(row)
         if len(rows) < 3:
             raise RuntimeError("Stooq returned fewer than three usable observations")
-        return {"provider": self.name, "source": url,
+        # Keep the credential out of provenance URLs and all generated reports.
+        safe_url = urllib.parse.urlunsplit(
+            (urllib.parse.urlsplit(url).scheme, urllib.parse.urlsplit(url).netloc,
+             urllib.parse.urlsplit(url).path,
+             urllib.parse.urlencode({k: v for k, v in params.items() if k != "apikey"}),
+             "")
+        )
+        return {"provider": self.name, "source": safe_url,
                 "source_sha256": hashlib.sha256(raw_bytes).hexdigest(),
                 "raw_observations": len(source_rows), "rows": rows}
 
