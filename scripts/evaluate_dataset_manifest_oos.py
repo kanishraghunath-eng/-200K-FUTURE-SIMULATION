@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import validate_canonical_rows
-from engine.providers import CsvProvider, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider
+from engine.providers import (CsvProvider, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider, reconcile_corporate_actions)
 from engine.backtest import walk_forward_barrier_diagnostic
 
 
@@ -45,6 +45,35 @@ def evaluate_dataset(item, paths=1000):
                 "provider": provider_name, "status": "provider_error",
                 "error_type": type(exc).__name__, "error": str(exc)[:500],
                 "manifest": manifest.to_dict()}
+    corporate_action_audit = None
+    corporate_action_payload = fetched.get("corporate_actions")
+    if item.get("corporate_actions_provider") == "eodhd":
+        try:
+            independent_actions = EodhdProvider().fetch_corporate_actions(
+                manifest, item.get("actions_start", item.get("start")),
+                item.get("end")
+            )
+            corporate_action_audit = reconcile_corporate_actions(
+                corporate_action_payload, independent_actions
+            )
+            corporate_action_audit["independent_source_hashes"] = {
+                name: value["sha256"] for name, value in independent_actions.items()
+            }
+            corporate_action_audit["independent_sources"] = {
+                name: value["source"] for name, value in independent_actions.items()
+            }
+        except Exception as exc:
+            corporate_action_audit = {
+                "status": "unavailable",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:300],
+                "limitations": ["Independent corporate-action source could not be retrieved."],
+            }
+    elif item.get("corporate_actions_applicability") == "not_applicable":
+        corporate_action_audit = {
+            "status": "not_applicable",
+            "evidence": item.get("corporate_actions_evidence", "Instrument classification"),
+        }
     audit = validate_canonical_rows(fetched["rows"], manifest,
                                     require_timezone=bool(item.get("require_timezone", False)))
     canonical_bytes = json.dumps(
@@ -59,6 +88,8 @@ def evaluate_dataset(item, paths=1000):
         "source_sha256": source_sha256,
         "data_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
         "ohlcv_included": fetched.get("ohlcv_included"),
+        "provider_corporate_actions": corporate_action_payload,
+        "corporate_action_audit": corporate_action_audit,
         "manifest": manifest.to_dict(), "audit": audit,
     }
     if not audit["valid"]:
