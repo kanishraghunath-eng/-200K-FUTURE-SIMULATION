@@ -83,17 +83,29 @@ def main():
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--paths", type=int, default=1000)
     parser.add_argument("--output", default="dataset_oos_report.json")
+    parser.add_argument("--minimum-evaluated", type=int, default=3)
     args = parser.parse_args()
-    if args.paths < 1:
-        parser.error("--paths must be positive")
+    if args.paths < 1 or args.minimum_evaluated < 1:
+        parser.error("--paths and --minimum-evaluated must be positive")
     payload = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     datasets = payload.get("datasets")
     if not isinstance(datasets, list) or not datasets:
         parser.error("manifest must contain a non-empty datasets list")
+    results = [evaluate_dataset(item, args.paths) for item in datasets]
+    statuses = {}
+    for result in results:
+        statuses[result["status"]] = statuses.get(result["status"], 0) + 1
+    evaluated = statuses.get("evaluated", 0)
     report = {"report_type":"per_dataset_oos_diagnostics", "paths":args.paths,
-              "datasets":[evaluate_dataset(item, args.paths) for item in datasets]}
+              "coverage_summary":{"dataset_count":len(results),"status_counts":statuses,
+                                  "evaluated_count":evaluated,
+                                  "minimum_evaluated_required":args.minimum_evaluated},
+              "datasets":results}
     Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False),
                                  encoding="utf-8")
+    if evaluated < args.minimum_evaluated:
+        raise SystemExit(f"insufficient provider coverage: {evaluated} evaluated; "
+                         f"{args.minimum_evaluated} required; report saved to {args.output}")
 
 
 if __name__ == "__main__":
