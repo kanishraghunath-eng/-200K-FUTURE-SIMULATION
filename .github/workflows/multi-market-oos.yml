@@ -8,6 +8,11 @@ on:
       - "scripts/evaluate_multi_market_oos.py"
       - "scripts/evaluate_dataset_manifest_oos.py"
       - "scripts/analyze_manifest_oos_uncertainty.py"
+      - "reports/oos/**"
+      - "datasets/confirmatory_oos_manifest.json"
+      - "engine/futures_roll_audit.py"
+      - "scripts/audit_futures_roll.py"
+      - "scripts/run_confirmatory_oos.py"
       - "engine/dataset_manifest.py"
       - "engine/canonical_data.py"
       - "engine/providers.py"
@@ -81,6 +86,26 @@ jobs:
           path: multi_asset_oos_uncertainty.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Run pre-registered confirmatory OOS readiness check
+        env:
+          EODHD_API_TOKEN: ${{ secrets.EODHD_API_TOKEN }}
+        run: |
+          python scripts/run_confirmatory_oos.py \
+            --manifest datasets/confirmatory_oos_manifest.json \
+            --paths 1000 \
+            --replicates 5000 \
+            --minimum-forecasts 250 \
+            --block-length 5 \
+            --output confirmatory_oos_report.json
+
+      - name: Upload confirmatory OOS readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: confirmatory-oos-readiness-report
+          path: confirmatory_oos_report.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Run existing multi-market held-out evaluation
         env:
