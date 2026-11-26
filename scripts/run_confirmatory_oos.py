@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.analyze_manifest_oos_uncertainty import block_bootstrap_skill_interval
 from scripts.evaluate_dataset_manifest_oos import evaluate_dataset
+from engine.backtest import walk_forward_barrier_diagnostic
 
 
 def _holm_adjust(results):
@@ -36,7 +37,7 @@ def _holm_adjust(results):
 
 def _metadata_blockers(item, evaluated):
     blockers = []
-    if evaluated.get("status") != "evaluated":
+    if evaluated.get("status") != "data_validated":
         blockers.append("dataset_status:" + str(evaluated.get("status")))
         return blockers
     if not evaluated.get("source_sha256") or not evaluated.get("data_sha256"):
@@ -79,7 +80,7 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
     awaiting = []
     prepared = []
     for item in candidates:
-        evaluated = evaluate_dataset(item, paths=paths)
+        evaluated = evaluate_dataset(item, paths=paths, data_only=True)
         blockers = _metadata_blockers(item, evaluated)
         if blockers:
             precondition_failures.append({
@@ -89,31 +90,28 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
             })
             continue
         timestamps = evaluated.get("observation_timestamps", [])
-        diagnostic_rows = evaluated.get("oos_diagnostic", {}).get("rows", [])
-        holdout_rows = []
-        for row in diagnostic_rows:
-            index = int(row["index"])
-            if index < 0 or index >= len(timestamps):
-                precondition_failures.append({
-                    "instrument_id": item["instrument_id"],
-                    "blockers": ["forecast_index_outside_observation_timestamps"],
-                })
-                holdout_rows = []
-                break
-            origin_date = str(timestamps[index])[:10]
-            if origin_date >= holdout_start.isoformat():
-                scored = dict(row)
-                scored["origin_date"] = origin_date
-                holdout_rows.append(scored)
+        prices = evaluated.pop("_prices", [])
+        first_origin = max(
+            int(item.get("min_train", 252)),
+            int(item.get("estimation_window", 252)),
+        )
+        horizon = int(item.get("horizon", 5))
+        potential_origins = [
+            index for index in range(first_origin, max(first_origin, len(prices) - horizon))
+            if index < len(timestamps)
+            and str(timestamps[index])[:10] >= holdout_start.isoformat()
+        ]
         prepared.append({
             "item": item,
             "evaluated": evaluated,
-            "holdout_rows": holdout_rows,
+            "prices": prices,
+            "timestamps": timestamps,
+            "potential_forecast_count": len(potential_origins),
         })
-        if len(holdout_rows) < minimum_forecasts:
+        if len(potential_origins) < minimum_forecasts:
             awaiting.append({
                 "instrument_id": item["instrument_id"],
-                "holdout_forecasts_available": len(holdout_rows),
+                "holdout_forecasts_available": len(potential_origins),
                 "minimum_required": minimum_forecasts,
                 "holdout_start": holdout_start.isoformat(),
                 "latest_observation": (
@@ -159,7 +157,39 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
     results = []
     for entry in prepared:
         item = entry["item"]
-        rows = entry["holdout_rows"]
+        evaluated = entry["evaluated"]
+        prices = entry["prices"]
+        diagnostic = walk_forward_barrier_diagnostic(
+            prices,
+            target_pct=float(item.get("target_pct", 0.03)),
+            stop_pct=float(item.get("stop_pct", 0.02)),
+            horizon=int(item.get("horizon", 5)),
+            min_train=int(item.get("min_train", 252)),
+            paths=paths,
+            seed=int(item.get("seed", 7)),
+            estimation_window=int(item.get("estimation_window", 252)),
+            calibration_window=int(item.get("calibration_window", 252)),
+            min_calibration_observations=int(item.get("min_calibration_observations", 100)),
+            min_calibration_improvement=float(item.get("min_calibration_improvement", 0.0)),
+            periods_per_year=int(evaluated["manifest"]["effective_periods_per_year"]),
+            step_year_fraction=float(item.get(
+                "step_year_fraction",
+                1.0 / int(evaluated["manifest"]["effective_periods_per_year"]),
+            )),
+        )
+        rows = []
+        for row in diagnostic["rows"]:
+            origin_index = int(row["index"])
+            origin_date = str(entry["timestamps"][origin_index])[:10]
+            if origin_date >= holdout_start.isoformat():
+                scored = dict(row)
+                scored["origin_date"] = origin_date
+                rows.append(scored)
+        if len(rows) < minimum_forecasts:
+            raise RuntimeError(
+                "confirmatory holdout became incomplete while scoring "
+                + item["instrument_id"]
+            )
         model_total = sum(float(x["brier_score"]) for x in rows)
         baseline_total = sum(float(x["baseline_brier_score"]) for x in rows)
         skill = 1.0 - model_total / baseline_total if baseline_total > 0 else None
@@ -171,9 +201,9 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
             "instrument_id": item["instrument_id"],
             "asset_class": item["asset_class"],
             "interval": item["interval"],
-            "provider": entry["evaluated"].get("provider"),
-            "source_sha256": entry["evaluated"].get("source_sha256"),
-            "data_sha256": entry["evaluated"].get("data_sha256"),
+            "provider": evaluated.get("provider"),
+            "source_sha256": evaluated.get("source_sha256"),
+            "data_sha256": evaluated.get("data_sha256"),
             "holdout_start": rows[0]["origin_date"],
             "holdout_end": rows[-1]["origin_date"],
             "oos_forecasts": len(rows),
