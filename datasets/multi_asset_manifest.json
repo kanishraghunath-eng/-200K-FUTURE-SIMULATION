@@ -137,6 +137,26 @@
       "horizon": 5,
       "min_train": 252,
       "estimation_window": 252
+    },
+    {
+      "instrument_id": "SPY",
+      "asset_class": "etf",
+      "source": "Yahoo Finance chart intraday",
+      "currency": "USD",
+      "interval": "1h",
+      "periods_per_year": 1638,
+      "timezone": "America/New_York",
+      "calendar": "NYSE",
+      "adjustment_basis": "unknown",
+      "corporate_actions_reviewed": false,
+      "provider": "yahoo",
+      "price_field": "close",
+      "start": "2024-11-26",
+      "end": "2026-11-26",
+      "horizon": 5,
+      "min_train": 252,
+      "estimation_window": 252,
+      "notes": "Hourly sample added for multi-timeframe exploratory validation; vendor intraday availability and session gaps require review."
     }
   ]
 }
