@@ -31,7 +31,10 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Compile all Python modules
-        run: python -m compileall -q engine tests
+        run: python -m compileall -q engine scripts tests
+
+      - name: Check manifest OOS runner interface
+        run: python scripts/evaluate_dataset_manifest_oos.py --help
 
       - name: Run complete unittest suite
         run: python -m unittest discover -s tests -v
