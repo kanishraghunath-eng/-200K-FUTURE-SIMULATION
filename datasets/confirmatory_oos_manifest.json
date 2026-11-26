@@ -3,7 +3,7 @@
   "status": "preregistered_waiting_for_future_holdout",
   "freeze_date": "2026-11-26",
   "holdout_start": "2026-11-27",
-  "scope": "Seven pre-registered instrument datasets spanning equity indices, FX, crypto spot, commodity spot, and adjusted bond/equity ETFs. Excluded datasets remain listed with explicit reasons; this is not universal market coverage.",
+  "scope": "Seven pre-registered instrument datasets spanning equity indices, FX, crypto spot, commodity spot, and adjusted bond/equity ETFs. Excluded datasets remain listed with explicit reasons; this is not universal market coverage. The holdout end date is fixed at 2027-12-31 to prevent repeated peeking or optional stopping.",
   "family_policy": "All seven candidate datasets must pass provider, schema, corporate-action, and minimum-sample gates. If any candidate is unavailable or fails a prerequisite, no family-level confirmatory conclusion is issued.",
   "pre_registered_hypothesis": "For each instrument, the fixed close-only GBM probability model has positive Brier Skill versus its causal rolling empirical baseline on the untouched holdout.",
   "primary_metric": "Brier Skill = 1 - model multiclass Brier / causal baseline multiclass Brier",
@@ -17,7 +17,8 @@
     "alpha": 0.05,
     "instrument_pass": "95% CI lower bound > 0 and Holm-adjusted one-sided bootstrap p-value < 0.05",
     "family_pass": "All seven instruments pass; otherwise family result is not confirmed",
-    "missing_data_rule": "No instrument is silently dropped or replaced after holdout begins; any missing/failed dataset makes the family incomplete."
+    "missing_data_rule": "No instrument is silently dropped or replaced after holdout begins; any missing/failed dataset makes the family incomplete. Do not extend the fixed holdout end date after observing results.",
+    "holdout_window": "2026-11-27 through 2027-12-31 inclusive; no early evaluation or extension."
   },
   "frozen_model_configuration": {
     "paths_per_forecast": 1000,
@@ -216,5 +217,6 @@
       "provider": "yahoo",
       "reason": "Intraday raw ETF close lacks an independently verified distribution-adjusted hourly series."
     }
-  ]
+  ],
+  "holdout_end": "2027-12-31"
 }
