@@ -12,6 +12,7 @@ on:
       - "engine/providers.py"
       - "datasets/multi_asset_manifest.json"
       - "tests/**"
+      - "docs/OOS_VALIDATION_MASTER_PLAN.md"
       - ".github/workflows/multi-market-oos.yml"
   workflow_dispatch:
 
