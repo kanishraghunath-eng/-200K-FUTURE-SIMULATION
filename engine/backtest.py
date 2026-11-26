@@ -22,7 +22,8 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
                                     horizon=10, min_train=60, paths=5000, seed=7,
                                     drift_convention="corrected", periods_per_year=252,
                                     step_year_fraction=None, estimation_window=252,
-                                    calibration_window=252, min_calibration_observations=100):
+                                    calibration_window=252, min_calibration_observations=100,
+                                    min_calibration_improvement=0.0):
     """Evaluate rolling GBM forecasts with causal baseline and probability blending.
 
     The default estimation window is 252 observations. A convex blend between
@@ -46,6 +47,9 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
         raise ValueError("calibration_window must be an integer >= 1")
     if not isinstance(min_calibration_observations, int) or min_calibration_observations < 1:
         raise ValueError("min_calibration_observations must be an integer >= 1")
+    if (not np.isfinite(min_calibration_improvement)
+            or not 0.0 <= min_calibration_improvement < 1.0):
+        raise ValueError("min_calibration_improvement must be in [0, 1)")
     dt = (1.0 / periods_per_year) if step_year_fraction is None else float(step_year_fraction)
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError("step_year_fraction must be a finite positive number")
@@ -111,6 +115,7 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
                 np.asarray([x["actual"] for x in calibration_rows], dtype=int)
             ]
             best_score = float("inf")
+            baseline_score = float(np.mean(np.sum((hist_base - hist_onehot) ** 2, axis=1)))
             for candidate in alpha_grid:
                 mixed = candidate * hist_raw + (1.0 - candidate) * hist_base
                 score = float(np.mean(np.sum((mixed - hist_onehot) ** 2, axis=1)))
@@ -118,6 +123,9 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
                 if score < best_score - 1e-12:
                     best_score = score
                     alpha = float(candidate)
+            # Require a minimum historical improvement before trusting a fitted blend.
+            if best_score > baseline_score * (1.0 - min_calibration_improvement):
+                alpha = 0.0
 
         calibrated = alpha * raw_probs + (1.0 - alpha) * baseline
         raw_score = float(np.sum((raw_probs - onehot) ** 2))
@@ -179,8 +187,9 @@ def walk_forward_barrier_diagnostic(prices, entry_offset=0.0, target_pct=0.03, s
         "estimation_window": estimation_window,
         "calibration_window": calibration_window,
         "min_calibration_observations": min_calibration_observations,
+        "min_calibration_improvement": min_calibration_improvement,
         "first_forecast_index": first_origin,
         "baseline_method": "rolling empirical frequencies of fully observed prior barrier outcomes",
-        "calibration_method": "causal convex blend fitted on matured prior out-of-sample forecasts; baseline-only fallback",
+        "calibration_method": "causal convex blend fitted on matured prior out-of-sample forecasts; minimum-improvement gate and baseline-only fallback",
         "warning": "Close-only diagnostic; not a profitability test. Same-bar OHLC order, costs and slippage are not modeled."
     }
