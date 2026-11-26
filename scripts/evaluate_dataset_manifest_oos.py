@@ -22,7 +22,7 @@ def evaluate_dataset(item, paths=1000):
     metadata_fields = {key: item[key] for key in (
         "instrument_id", "asset_class", "source", "currency", "interval")}
     optional = ("price_field", "timezone", "calendar", "adjustment_basis",
-                "corporate_actions_reviewed", "futures_roll_method", "notes")
+                "corporate_actions_reviewed", "futures_roll_method", "notes", "periods_per_year")
     metadata_fields.update({key: item[key] for key in optional if key in item})
     manifest = DatasetManifest(**metadata_fields)
     manifest.validate()
@@ -49,9 +49,9 @@ def evaluate_dataset(item, paths=1000):
     diagnostic = walk_forward_barrier_diagnostic(
         prices, horizon=horizon, min_train=min_train, paths=paths,
         estimation_window=estimation_window,
-        periods_per_year=int(item.get("periods_per_year", 252)),
+        periods_per_year=manifest.effective_periods_per_year,
         step_year_fraction=float(item.get("step_year_fraction",
-                                          1.0 / int(item.get("periods_per_year", 252)))),
+                                          1.0 / manifest.effective_periods_per_year)),
     )
     return dict(base, status="evaluated", observations=len(prices),
                 oos_diagnostic=diagnostic,
