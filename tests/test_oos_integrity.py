@@ -6,6 +6,9 @@ import numpy as np
 from engine.backtest import _barrier_class, walk_forward_barrier_diagnostic
 from engine.providers import YahooFinanceChartProvider
 from engine.dataset_manifest import DatasetManifest
+from scripts.evaluate_multi_market_oos import (
+    apply_holm_adjustment, block_bootstrap_skill_interval,
+)
 
 
 class FakeResponse:
@@ -94,6 +97,50 @@ class WalkForwardIntegrityTests(unittest.TestCase):
         second = self.run_diagnostic(prices)
         self.assertEqual(first["multiclass_brier_score"], second["multiclass_brier_score"])
         self.assertEqual(first["rows"], second["rows"])
+
+
+
+class StatisticalValidationTests(unittest.TestCase):
+    def test_block_bootstrap_is_reproducible_and_reports_uncertainty(self):
+        rows = []
+        for i in range(120):
+            baseline = 0.50 + (0.01 if i % 2 else -0.01)
+            model = baseline - 0.04
+            rows.append({
+                "baseline_brier_score": baseline,
+                "brier_score": model,
+                "_bootstrap_segment": "fold-A" if i < 60 else "fold-B",
+            })
+        first = block_bootstrap_skill_interval(rows, block_length=5,
+                                               replicates=200, seed=17)
+        second = block_bootstrap_skill_interval(rows, block_length=5,
+                                                replicates=200, seed=17)
+        self.assertEqual(first, second)
+        self.assertEqual(first["status"], "estimated")
+        self.assertEqual(first["brier_skill_ci_95"], second["brier_skill_ci_95"])
+        self.assertGreater(first["brier_skill_ci_95"][0], 0.0)
+        self.assertEqual(first["replicates"], 200)
+
+    def test_holm_adjustment_is_monotonic_and_family_scoped(self):
+        def score(p):
+            return {"block_bootstrap": {"one_sided_bootstrap_p_value": p}}
+        datasets = {
+            "A": {"oos_validation": {"aggregate_oos_by_gate": {
+                "0": score(0.01), "1": score(0.03)}}},
+            "B": {"oos_validation": {"aggregate_oos_by_gate": {
+                "0": score(0.04)}}},
+        }
+        apply_holm_adjustment(datasets)
+        adjusted = sorted(
+            item["block_bootstrap"]["holm_adjusted_p_value"]
+            for dataset in datasets.values()
+            for item in dataset["oos_validation"]["aggregate_oos_by_gate"].values()
+        )
+        self.assertEqual(adjusted, sorted(adjusted))
+        self.assertEqual(adjusted, [0.03, 0.06, 0.06])
+        for dataset in datasets.values():
+            for item in dataset["oos_validation"]["aggregate_oos_by_gate"].values():
+                self.assertEqual(item["block_bootstrap"]["holm_family_size"], 3)
 
 
 class ProviderPriceBasisTests(unittest.TestCase):
