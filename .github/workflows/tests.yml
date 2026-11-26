@@ -39,5 +39,11 @@ jobs:
       - name: Check manifest OOS uncertainty analyzer interface
         run: python scripts/analyze_manifest_oos_uncertainty.py --help
 
+      - name: Check confirmatory OOS runner interface
+        run: python scripts/run_confirmatory_oos.py --help
+
+      - name: Check futures roll audit interface
+        run: python scripts/audit_futures_roll.py --help
+
       - name: Run complete unittest suite
         run: python -m unittest discover -s tests -v
