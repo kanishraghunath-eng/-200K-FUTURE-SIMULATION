@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import validate_canonical_rows
-from engine.providers import CsvProvider, YahooFinanceChartProvider, StooqCsvProvider
+from engine.providers import CsvProvider, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider
 from engine.backtest import walk_forward_barrier_diagnostic
 
 
@@ -34,6 +34,8 @@ def evaluate_dataset(item, paths=1000):
         provider = YahooFinanceChartProvider()
     elif provider_name == "stooq":
         provider = StooqCsvProvider()
+    elif provider_name == "eodhd":
+        provider = EodhdProvider()
     else:
         raise ValueError(f"unsupported provider: {provider_name}")
     try:
