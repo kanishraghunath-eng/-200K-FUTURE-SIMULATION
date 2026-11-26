@@ -241,110 +241,58 @@ def convergence_check(dataset_rows, samples_per_fold):
     }
 
 
-def cross_provider_check(yahoo_rows):
-    """Compare Yahoo adjusted returns with Stooq close returns when a key is configured."""
-    public_url = "https://stooq.com/q/d/l/?s=spy.us&i=d"
-    api_key = os.environ.get("STOOQ_API_KEY", "").strip()
-    if not api_key:
-        return {
-            "status": "api_key_required",
-            "overlapping_return_observations": 0,
-            "source_url": public_url,
-            "required_configuration": "Set GitHub Actions repository secret STOOQ_API_KEY.",
-            "note": "Stooq currently requires an API key for CSV downloads. No provider comparison is claimed until authenticated data is returned.",
-        }
-
-    query = urllib.parse.urlencode({"s": "spy.us", "i": "d", "apikey": api_key})
+def cross_provider_check(yahoo_rows, symbol="VTI"):
+    """Compare Yahoo adjusted returns with EODHD adjusted returns for VTI."""
+    public_url = f"https://eodhd.com/api/eod/{symbol}.US"
+    query = urllib.parse.urlencode({
+        "api_token": "demo", "from": min(x[0] for x in yahoo_rows),
+        "to": max(x[0] for x in yahoo_rows), "period": "d", "fmt": "json",
+    })
     request = urllib.request.Request(
-        f"https://stooq.com/q/d/l/?{query}",
-        headers={"User-Agent": "200k-future-simulation-provider-check/1.0",
-                 "Accept": "text/csv"},
+        f"{public_url}?{query}",
+        headers={"User-Agent": "200k-future-simulation-provider-check/1.0", "Accept": "application/json"},
     )
     try:
         with urllib.request.urlopen(request, timeout=45) as response:
             status_code = getattr(response, "status", 200)
-            raw = response.read().decode("utf-8-sig", errors="replace")
+            raw = response.read().decode("utf-8", errors="replace")
         if status_code != 200:
-            return {
-                "status": "http_error",
-                "http_status": status_code,
-                "source_url": public_url,
-                "note": "Stooq did not return a successful CSV response.",
-            }
-        first_line = raw.lstrip().splitlines()[0].strip() if raw.strip() else ""
-        if "Date" not in first_line or "Close" not in first_line:
-            lowered = raw.lower()
-            reason = ("api_key_rejected" if "apikey" in lowered or "api key" in lowered
-                      or "get your" in lowered else
-                      "rate_limited" if "limit" in lowered or "quota" in lowered else
-                      "invalid_response")
-            return {
-                "status": reason,
-                "overlapping_return_observations": 0,
-                "source_url": public_url,
-                "response_type": "non_csv",
-                "note": "Stooq response was not the expected Date/Close CSV; response body is intentionally not copied into the report.",
-            }
-
-        stooq = {}
-        reader = csv.DictReader(raw.splitlines())
-        for row in reader:
-            date, close_text = row.get("Date"), row.get("Close")
-            if not date or close_text in (None, "", "-", "N/D"):
-                continue
+            return {"status": "http_error", "http_status": status_code, "source_url": public_url}
+        payload = json.loads(raw)
+        if not isinstance(payload, list):
+            return {"status": "invalid_response", "source_url": public_url}
+        vendor = {}
+        for row in payload:
             try:
-                close = float(close_text)
+                close = float(row.get("adjusted_close"))
             except (TypeError, ValueError):
                 continue
-            if close > 0 and len(date) == 10:
-                stooq[date] = close
-
-        yahoo = {date: float(close) for date, close in yahoo_rows}
-        overlap = sorted(set(yahoo) & set(stooq))
-        yahoo_returns, stooq_returns = [], []
+            if row.get("date") and close > 0:
+                vendor[str(row["date"])] = close
+        yahoo = {d: float(v) for d, v in yahoo_rows}
+        overlap = sorted(set(yahoo) & set(vendor))
+        a, b = [], []
         for previous, current in zip(overlap, overlap[1:]):
-            yahoo_returns.append(math.log(yahoo[current] / yahoo[previous]))
-            stooq_returns.append(math.log(stooq[current] / stooq[previous]))
-        if len(yahoo_returns) < 100:
-            return {
-                "status": "insufficient_overlap",
-                "overlapping_return_observations": len(yahoo_returns),
-                "yahoo_common_dates": len(overlap),
-                "stooq_observations": len(stooq),
-                "source_url": public_url,
-                "note": "Authenticated Stooq CSV parsed, but fewer than 100 matched return intervals were available.",
-            }
-        return {
-            "status": "completed",
-            "overlapping_return_observations": len(yahoo_returns),
-            "yahoo_common_dates": len(overlap),
-            "stooq_observations": len(stooq),
-            "pearson_daily_return_correlation": statistics.correlation(yahoo_returns, stooq_returns),
-            "daily_return_sign_agreement": sum(
-                (a >= 0) == (b >= 0) for a, b in zip(yahoo_returns, stooq_returns)
-            ) / len(yahoo_returns),
-            "median_absolute_daily_log_return_difference": statistics.median(
-                abs(a - b) for a, b in zip(yahoo_returns, stooq_returns)
-            ),
-            "source_url": public_url,
-            "note": "Stooq close-price basis is not assumed dividend-adjusted; compare matched returns only, not price levels or calibration scores.",
-        }
+            a.append(math.log(yahoo[current] / yahoo[previous]))
+            b.append(math.log(vendor[current] / vendor[previous]))
+        if len(a) < 100:
+            return {"status": "insufficient_overlap", "overlapping_return_observations": len(a),
+                    "yahoo_common_dates": len(overlap), "eodhd_observations": len(vendor),
+                    "source_url": public_url, "price_basis": "split-and-dividend-adjusted close"}
+        return {"status": "completed", "provider": "EODHD", "instrument": symbol + ".US",
+                "overlapping_return_observations": len(a), "yahoo_common_dates": len(overlap),
+                "eodhd_observations": len(vendor),
+                "pearson_daily_return_correlation": statistics.correlation(a, b),
+                "daily_return_sign_agreement": sum((x >= 0) == (y >= 0) for x, y in zip(a, b)) / len(a),
+                "median_absolute_daily_log_return_difference": statistics.median(abs(x-y) for x, y in zip(a, b)),
+                "source_url": public_url, "price_basis": "split-and-dividend-adjusted close on both sources"}
     except urllib.error.HTTPError as exc:
-        status = "rate_limited" if exc.code == 429 else "access_denied" if exc.code in (401, 403) else "http_error"
-        return {
-            "status": status,
-            "http_status": exc.code,
-            "source_url": public_url,
-            "note": "Stooq rejected or could not serve the authenticated CSV request.",
-        }
+        status = "access_denied" if exc.code in (401, 403) else "rate_limited" if exc.code == 429 else "http_error"
+        return {"status": status, "http_status": exc.code, "source_url": public_url}
+    except (urllib.error.URLError, TimeoutError):
+        return {"status": "unavailable", "source_url": public_url}
     except Exception as exc:
-        return {
-            "status": "unavailable",
-            "source_url": public_url,
-            "error_type": type(exc).__name__,
-            "note": "Independent-provider cross-check did not complete; no vendor-independence claim is made.",
-        }
-
+        return {"status": "invalid_response", "error_type": type(exc).__name__, "source_url": public_url}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -395,6 +343,14 @@ def main():
             "brier_skill_vs_baseline": 1.0 - calibrated / baseline if baseline > 0 else None,
         }
 
+    # VTI is in EODHD documented demo coverage; compare independent adjusted-return series.
+    try:
+        _, yahoo_vti_rows, yahoo_vti_url = fetch_adjusted_close("VTI")
+        provider_result = cross_provider_check(yahoo_vti_rows, symbol="VTI")
+        provider_result["yahoo_source_url"] = yahoo_vti_url
+    except Exception as exc:
+        provider_result = {"status": "yahoo_reference_unavailable", "error_type": type(exc).__name__}
+
     report = {
         "study": "multi-market held-out walk-forward calibration and Monte Carlo path-count stability",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -420,9 +376,10 @@ def main():
         },
         "datasets": datasets,
         "independent_provider_crosscheck": {
-            "instrument": "SPY",
-            "provider": "Stooq daily close",
-            "result": cross_provider_check(raw_rows_by_symbol["SPY"]),
+            "instrument": "VTI",
+            "reference_provider": "Yahoo Finance adjusted close",
+            "comparison_provider": "EODHD adjusted close",
+            "result": provider_result,
         },
         "combined_oos_by_gate": combined,
         "decision": "No default recommendation is made automatically; review cross-market and cross-period consistency, sample sizes, source caveats, and path-count sensitivity.",
