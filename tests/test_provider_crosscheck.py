@@ -1,4 +1,5 @@
 import json
+import os
 import math
 import unittest
 from datetime import date, timedelta
@@ -6,6 +7,7 @@ from unittest.mock import patch
 
 from scripts.evaluate_multi_market_oos import cross_provider_check
 from scripts.benchmark_200k import run_case, synthetic_history
+from engine.monte_carlo import simulate_price_paths
 
 
 class FakeResponse:
@@ -34,6 +36,14 @@ class IndependentProviderTests(unittest.TestCase):
         self.assertIn("api_token=demo", urlopen.call_args.args[0].full_url)
         self.assertNotIn("api_token", result["source_url"])
 
+    def test_core_simulation_does_not_require_provider_credentials(self):
+        prices = synthetic_history(observations=80)
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("scripts.evaluate_multi_market_oos.urllib.request.urlopen",
+                       side_effect=AssertionError("core simulation must not fetch external data")):
+                result = simulate_price_paths(prices, steps=5, paths=128, seed=3,
+                                              return_paths=False)
+        self.assertEqual(result["summary"]["path_count"], 128)
     def test_provider_denial_is_not_claimed_as_completed(self):
         with patch("scripts.evaluate_multi_market_oos.urllib.request.urlopen",
                    return_value=FakeResponse("not-json")):
