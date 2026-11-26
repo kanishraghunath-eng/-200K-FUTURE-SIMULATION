@@ -66,3 +66,5 @@ Use `engine.dataset_manifest.DatasetManifest` to declare each instrument's asset
 Use `engine.canonical_data` to map and validate provider rows. Validation never repairs data. Interval gaps may be warnings when exchange calendars or session breaks are not independently available.
 Optional provider adapters are in `engine.providers`: CSV, Yahoo Finance chart, Stooq daily and EODHD daily. Keep provider failures and source provenance explicit.
 For reproducible multi-instrument evaluation, use `scripts/evaluate_dataset_manifest_oos.py`. It reports each dataset separately; do not combine the outputs into one universal accuracy score. A successful input audit is not evidence of predictive accuracy.
+
+Canonical market-data rows may include optional open/high/low/volume. Validate OHLC range consistency and volume, and never combine raw OHLC with adjusted close as if they shared one price basis.
