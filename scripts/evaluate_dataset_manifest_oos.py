@@ -55,8 +55,10 @@ def evaluate_dataset(item, paths=1000):
     horizon = int(item.get("horizon", 5))
     min_train = int(item.get("min_train", 60))
     estimation_window = int(item.get("estimation_window", 252))
-    if len(prices) < max(min_train + horizon + 3, 70):
-        return dict(base, status="insufficient_data", observations=len(prices))
+    required = max(min_train, estimation_window) + horizon + 1
+    if len(prices) < max(required, 70):
+        return dict(base, status="insufficient_data", observations=len(prices),
+                    required_observations=max(required, 70))
     diagnostic = walk_forward_barrier_diagnostic(
         prices, horizon=horizon, min_train=min_train, paths=paths,
         estimation_window=estimation_window,
