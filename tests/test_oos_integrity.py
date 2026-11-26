@@ -5,7 +5,27 @@ import numpy as np
 
 from engine.backtest import _barrier_class, walk_forward_barrier_diagnostic
 from engine.providers import YahooFinanceChartProvider
-from tests.test_canonical_providers import FakeResponse, manifest
+from engine.dataset_manifest import DatasetManifest
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        return False
+    def read(self):
+        return self.body
+
+
+def manifest(price_field="close"):
+    return DatasetManifest(
+        instrument_id="TEST", asset_class="equity_index", source="fixture",
+        currency="INR", interval="daily", periods_per_year=252,
+        timezone="Asia/Kolkata", calendar="NSE", adjustment_basis="unknown",
+        price_field=price_field,
+    )
 
 
 class WalkForwardIntegrityTests(unittest.TestCase):
