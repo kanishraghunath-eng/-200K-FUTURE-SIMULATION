@@ -20,6 +20,9 @@ A reusable, platform-independent instruction skill and Python analysis library. 
 8. Use WAIT, NO TRADE or INSUFFICIENT DATA when evidence is inadequate. Do not force a directional conclusion.
 9. No claims of live data, broker access or order execution unless verified. Keep responses educational and non-personalized; do not provide individualized buy/sell or investment-sizing instructions.
 
+## Optional external-provider cross-check
+The core simulation engine and CSV-based workflow do not require a Stooq account, Stooq API key, or any external provider credential. The optional multi-market research script can attempt a separate Stooq comparison when `STOOQ_API_KEY` is configured. If it is not configured or Stooq cannot provide valid data, record `api_key_required` or another explicit unavailable status and continue the simulation/OOS evaluation. Never describe the provider comparison as completed unless valid overlapping return observations were actually compared.
+
 ## Workflow
 1. Define instrument, market, timeframe, forecast horizon and analysis question.
 2. Load CSV using engine.data_io.load_price_csv; review timestamp order, duplicates, price values, interval gaps, currency and corporate-action status.
