@@ -43,6 +43,7 @@ class DatasetManifest:
     data_sha256: Optional[str] = None
     futures_roll_method: Optional[str] = None
     notes: Optional[str] = None
+    periods_per_year: Optional[int] = None
 
     def validate(self):
         errors = []
@@ -58,6 +59,12 @@ class DatasetManifest:
                 errors.append("currency must be a three-letter uppercase currency/unit code")
         if self.interval not in INTERVALS:
             errors.append(f"interval must be one of: {', '.join(sorted(INTERVALS))}")
+        if self.periods_per_year is not None and (
+                not isinstance(self.periods_per_year, int) or isinstance(self.periods_per_year, bool)
+                or self.periods_per_year <= 0):
+            errors.append("periods_per_year must be a positive integer when supplied")
+        if self.periods_per_year is None and self.interval in {"tick", "1m", "5m", "15m", "30m", "1h", "4h"}:
+            errors.append("intraday/tick datasets require explicit periods_per_year")
         if self.adjustment_basis not in ADJUSTMENT_BASES:
             errors.append(f"adjustment_basis must be one of: {', '.join(sorted(ADJUSTMENT_BASES))}")
         if self.timezone:
@@ -89,7 +96,21 @@ class DatasetManifest:
         if errors:
             raise ValueError("; ".join(errors))
         return {"valid": True, "instrument_id": self.instrument_id,
-                "asset_class": self.asset_class, "interval": self.interval}
+                "asset_class": self.asset_class, "interval": self.interval,
+                "periods_per_year": self.effective_periods_per_year}
+
+    @property
+    def effective_periods_per_year(self):
+        """Resolve only coarse-interval defaults; intraday must be explicit."""
+        if self.periods_per_year is not None:
+            return self.periods_per_year
+        if self.interval == "daily":
+            return 365 if self.asset_class == "crypto" else 252
+        if self.interval == "weekly":
+            return 52
+        if self.interval == "monthly":
+            return 12
+        raise ValueError("periods_per_year must be explicitly configured for this interval")
 
     def to_dict(self):
         """Return JSON-serializable metadata after validation."""
