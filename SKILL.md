@@ -64,5 +64,5 @@ Historical simulations now use corrected drift by default. The legacy convention
 ## Multi-market data workflow
 Use `engine.dataset_manifest.DatasetManifest` to declare each instrument's asset class, source, currency, bar interval, timezone, calendar and adjustment basis. Intraday/tick inputs must declare `periods_per_year`; do not assume the same annualization across equity sessions, FX, and 24x7 crypto.
 Use `engine.canonical_data` to map and validate provider rows. Validation never repairs data. Interval gaps may be warnings when exchange calendars or session breaks are not independently available.
-Optional provider adapters are in `engine.providers`: CSV, Yahoo Finance chart and Stooq daily. Keep provider failures and source provenance explicit.
+Optional provider adapters are in `engine.providers`: CSV, Yahoo Finance chart, Stooq daily and EODHD daily. Keep provider failures and source provenance explicit.
 For reproducible multi-instrument evaluation, use `scripts/evaluate_dataset_manifest_oos.py`. It reports each dataset separately; do not combine the outputs into one universal accuracy score. A successful input audit is not evidence of predictive accuracy.
