@@ -59,7 +59,7 @@ The GBM primitive accepts arithmetic drift mu and applies log increments `(mu - 
 - `engine/dataset_manifest.py` defines a validated instrument/dataset contract for equity, indices, ETFs, FX, commodities, crypto and other supported categories.
 - `periods_per_year` is explicit for intraday/tick datasets. Conservative defaults are provided for daily, weekly and monthly bars; crypto daily uses 365 while other daily families default to 252. Confirm the actual session convention before relying on annualized values.
 - `engine/canonical_data.py` maps provider fields to canonical timestamp/close/currency/price-basis rows and validates ordering, duplicates, timezone awareness when required, and interval consistency warnings without repairing input.
-- `engine/providers.py` provides a pluggable provider contract and CSV, Yahoo Finance chart, and Stooq daily adapters. External providers can rate-limit, change schemas or deny access; provider failures must remain explicit.
+- `engine/providers.py` provides a pluggable provider contract and CSV, Yahoo Finance chart, Stooq daily, and EODHD daily adapters. External providers can rate-limit, change schemas or deny access; provider failures must remain explicit.
 - `scripts/evaluate_dataset_manifest_oos.py` evaluates each manifest dataset independently and writes per-instrument OOS diagnostics. Use real, provenance-documented datasets; synthetic fixtures test plumbing only.
 
 Example manifest item:
