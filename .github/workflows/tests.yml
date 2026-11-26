@@ -36,5 +36,8 @@ jobs:
       - name: Check manifest OOS runner interface
         run: python scripts/evaluate_dataset_manifest_oos.py --help
 
+      - name: Check manifest OOS uncertainty analyzer interface
+        run: python scripts/analyze_manifest_oos_uncertainty.py --help
+
       - name: Run complete unittest suite
         run: python -m unittest discover -s tests -v
