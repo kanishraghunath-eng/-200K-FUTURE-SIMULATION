@@ -69,8 +69,11 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
                               minimum_forecasts=250, block_length=5):
     freeze_date = date.fromisoformat(payload["freeze_date"])
     holdout_start = date.fromisoformat(payload["holdout_start"])
+    holdout_end = date.fromisoformat(payload["holdout_end"])
     if holdout_start <= freeze_date:
         raise ValueError("holdout_start must be strictly later than the protocol freeze_date")
+    if holdout_end < holdout_start:
+        raise ValueError("holdout_end must not be earlier than holdout_start")
     candidates = [item for item in payload.get("datasets", [])
                   if item.get("confirmatory_candidate", True)]
     if not candidates:
@@ -124,7 +127,7 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
         potential_origins = [
             index for index in range(first_origin, max(first_origin, len(prices) - horizon))
             if index < len(timestamps)
-            and str(timestamps[index])[:10] >= holdout_start.isoformat()
+            and holdout_start.isoformat() <= str(timestamps[index])[:10] <= holdout_end.isoformat()
         ]
         prepared.append({
             "item": item,
@@ -142,6 +145,9 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
                 "latest_observation": (
                     str(timestamps[-1]) if timestamps else None
                 ),
+                "holdout_window_complete": bool(
+                    timestamps and str(timestamps[-1])[:10] >= holdout_end.isoformat()
+                ),
             })
 
     report = {
@@ -150,6 +156,7 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
         "protocol_status": payload.get("status"),
         "freeze_date": freeze_date.isoformat(),
         "holdout_start": holdout_start.isoformat(),
+        "holdout_end": holdout_end.isoformat(),
         "paths_per_forecast": paths,
         "bootstrap_replicates": replicates,
         "block_length": block_length,
@@ -176,7 +183,11 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
         report["status"] = "blocked_incomplete_family"
         return report
     if awaiting:
-        report["status"] = "awaiting_future_holdout"
+        report["status"] = (
+            "insufficient_confirmatory_sample"
+            if all(x["holdout_window_complete"] for x in awaiting)
+            else "awaiting_future_holdout"
+        )
         return report
 
     results = []
@@ -208,7 +219,7 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
         for row in diagnostic["rows"]:
             origin_index = int(row["index"])
             origin_date = str(entry["timestamps"][origin_index])[:10]
-            if origin_date >= holdout_start.isoformat():
+            if holdout_start.isoformat() <= origin_date <= holdout_end.isoformat():
                 scored = dict(row)
                 scored["origin_date"] = origin_date
                 rows.append(scored)
