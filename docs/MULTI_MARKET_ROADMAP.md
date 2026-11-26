@@ -141,9 +141,9 @@ The feature branch now contains the first implementation slice:
 - Existing `engine/dataset_manifest.py` and `engine/instrument.py` provide explicit instrument/dataset metadata, IANA timezone validation, corporate-action and futures-roll status, and interval declarations.
 - `periods_per_year` is now included in the dataset manifest. Intraday/tick intervals require an explicit annualization convention; daily/weekly/monthly have conservative defaults that must still be checked against the instrument's session convention.
 - `engine/canonical_data.py` maps provider fields and checks timestamp order, duplicate times, close validity, declared currency/price basis, and interval gaps without repairing input.
-- `engine/providers.py` supplies pluggable CSV, Yahoo Finance chart, and Stooq daily adapters. Provider network access is optional and failures are captured per dataset.
+- `engine/providers.py` supplies pluggable CSV, Yahoo Finance chart, Stooq daily, and EODHD daily adapters. Provider network access is optional and failures are captured per dataset.
 - `scripts/evaluate_dataset_manifest_oos.py` runs independent diagnostics for each dataset and writes source hashes, metadata, audit findings, and per-instrument OOS metrics.
-- `datasets/multi_asset_manifest.json` defines representative India/US equity indices, FX, crypto, commodity futures, and bond ETF datasets, plus a Stooq ETF sample.
-- Unit tests cover metadata, canonical validation, CSV provider behavior, mocked Yahoo/Stooq parsing, and insufficient-history handling.
+- `datasets/multi_asset_manifest.json` defines representative India/US equity indices, FX, crypto, commodity futures, and bond ETF datasets, plus Stooq and EODHD ETF samples.
+- Unit tests cover metadata, canonical validation, CSV provider behavior, mocked Yahoo/Stooq/EODHD parsing, and insufficient-history handling.
 
 Important: these are implementation and plumbing milestones, not proof that every market family is validated. The hosted multi-asset OOS workflow is still running; final provider coverage and per-market metrics must be read from its artifact. Data-source availability, adjustment quality, exchange calendars, futures roll construction, and model fit remain independent review items.
