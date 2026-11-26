@@ -52,7 +52,7 @@ class YahooFinanceChartProvider(PriceDataProvider):
     def fetch(self, dataset, start=None, end=None):
         interval_map = {"daily": "1d", "weekly": "1wk", "monthly": "1mo",
                         "1m": "1m", "5m": "5m", "15m": "15m",
-                        "30m": "30m", "1h": "60m", "4h": "60m"}
+                        "30m": "30m", "1h": "60m"}
         if dataset.interval not in interval_map:
             raise ValueError("Yahoo adapter does not support this interval")
         if dataset.price_field not in {"close", "adjusted_close"}:
