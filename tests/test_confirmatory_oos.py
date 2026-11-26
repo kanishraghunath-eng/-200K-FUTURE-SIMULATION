@@ -29,11 +29,12 @@ def payload(item):
 
 def evaluated(timestamps, rows, **overrides):
     result = {
-        "status": "evaluated", "provider": "fixture",
+        "status": "data_validated", "provider": "fixture",
         "source_sha256": "a" * 64, "data_sha256": "b" * 64,
         "audit": {"valid": True},
         "corporate_action_audit": {"status": "not_applicable"},
         "observation_timestamps": timestamps,
+        "_prices": [100.0 + index * 0.1 for index in range(len(timestamps))],
         "oos_diagnostic": {"rows": rows},
     }
     result.update(overrides)
@@ -48,17 +49,21 @@ class ConfirmatoryOOSTests(unittest.TestCase):
             run_confirmatory_manifest(manifest)
 
     def test_pre_freeze_forecasts_are_not_scored_and_future_holdout_waits(self):
-        rows = [
-            {"index": 0, "brier_score": 0.3, "baseline_brier_score": 0.5},
-            {"index": 1, "brier_score": 0.3, "baseline_brier_score": 0.5},
+        timestamps = [
+            "2026-11-26T00:00:00+00:00",
+            "2026-11-27T00:00:00+00:00",
+            "2026-11-28T00:00:00+00:00",
+            "2026-11-29T00:00:00+00:00",
+            "2026-11-30T00:00:00+00:00",
         ]
-        data = evaluated(
-            ["2026-11-26T00:00:00+00:00", "2026-11-27T00:00:00+00:00"],
-            rows,
-        )
+        rows = [
+            {"index": 3, "brier_score": 0.3, "baseline_brier_score": 0.5},
+        ]
+        item = base_item(min_train=3, estimation_window=3, horizon=1)
+        data = evaluated(timestamps, rows)
         with patch("scripts.run_confirmatory_oos.evaluate_dataset", return_value=data):
             report = run_confirmatory_manifest(
-                payload(base_item()), paths=100, replicates=200,
+                payload(item), paths=100, replicates=200,
                 minimum_forecasts=2,
             )
         self.assertEqual(report["status"], "awaiting_future_holdout")
