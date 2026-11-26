@@ -61,7 +61,7 @@ def load_prices(url):
     return raw, data
 
 
-def evaluate(data, paths):
+def evaluate(data, paths, min_calibration_improvement=0.0):
     dates = [row[0] for row in data]
     closes = [row[1] for row in data]
     report = []
@@ -87,6 +87,7 @@ def evaluate(data, paths):
             estimation_window=estimation_window,
             calibration_window=252,
             min_calibration_observations=100,
+            min_calibration_improvement=min_calibration_improvement,
         )
         alpha_counts = Counter(str(row["calibration_alpha"]) for row in result["rows"])
         report.append({
@@ -132,10 +133,14 @@ def main():
             "estimation_window_observations": 252,
             "calibration_window_forecasts": 252,
             "minimum_matured_calibration_forecasts": 100,
+            "minimum_calibration_improvement_grid": [0.0, 0.005, 0.01, 0.02],
             "random_seed": 7,
             "evaluation": "close-only walk-forward; not a profitability test",
         },
-        "regimes": evaluate(data, args.paths),
+        "regime_comparison": {
+            str(gate): evaluate(data, args.paths, min_calibration_improvement=gate)
+            for gate in (0.0, 0.005, 0.01, 0.02)
+        },
     }
     output = Path(args.output)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
