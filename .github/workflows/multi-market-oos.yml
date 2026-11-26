@@ -49,6 +49,9 @@ jobs:
         run: python scripts/evaluate_dataset_manifest_oos.py --help
 
       - name: Run per-asset manifest-driven OOS evaluation
+        env:
+          STOOQ_API_KEY: ${{ secrets.STOOQ_API_KEY }}
+          EODHD_API_TOKEN: ${{ secrets.EODHD_API_TOKEN }}
         run: |
           python scripts/evaluate_dataset_manifest_oos.py \
             --manifest datasets/multi_asset_manifest.json \
