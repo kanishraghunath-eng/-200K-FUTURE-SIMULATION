@@ -84,6 +84,10 @@ class ProviderTests(unittest.TestCase):
             self.assertEqual(registry.names(),("csv",))
             self.assertIs(registry.get("csv"),provider)
 
+    def test_yahoo_rejects_unsupported_four_hour_interval(self):
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            YahooFinanceChartProvider().fetch(manifest(interval="4h", periods_per_year=1638))
+
     def test_yahoo_provider_maps_chart_payload(self):
         import json
         import datetime
