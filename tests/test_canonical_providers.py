@@ -122,6 +122,21 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual([float(x["close"]) for x in result["rows"]], [100,101,99])
         self.assertTrue(all("T" in x["timestamp"] for x in result["rows"]))
 
+    def test_yahoo_can_explicitly_exclude_optional_ohlcv_for_close_only(self):
+        import json
+        import datetime
+        stamps = [int(datetime.datetime(2026, 1, d, tzinfo=datetime.timezone.utc).timestamp())
+                  for d in (5, 6, 7)]
+        payload = {"chart":{"result":[{"timestamp":stamps,
+                   "indicators":{"quote":[{"open":[99,100,101],"high":[102,103,104],
+                   "low":[98,99,100],"close":[100,101,102],"volume":[10,11,12]}]}}],
+                   "error":None}}
+        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+            result = YahooFinanceChartProvider(include_ohlcv=False).fetch(manifest())
+        self.assertFalse(result["ohlcv_included"])
+        for row in result["rows"]:
+            self.assertEqual(set(row), {"timestamp", "close", "currency", "price_basis"})
+
     def test_yahoo_provider_maps_chart_payload(self):
         import json
         import datetime
@@ -170,6 +185,8 @@ class ProviderTests(unittest.TestCase):
             result = evaluate_dataset(item, paths=20)
             self.assertEqual(result["status"], "insufficient_data")
             self.assertGreater(result["required_observations"], result["observations"])
+            self.assertEqual(len(result["source_sha256"]), 64)
+            self.assertEqual(len(result["data_sha256"]), 64)
 
 
 if __name__ == "__main__":
