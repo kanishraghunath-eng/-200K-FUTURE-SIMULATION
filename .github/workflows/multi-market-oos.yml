@@ -6,6 +6,7 @@ on:
     paths:
       - "engine/**"
       - "scripts/evaluate_multi_market_oos.py"
+      - "tests/**"
       - ".github/workflows/multi-market-oos.yml"
   workflow_dispatch:
 
