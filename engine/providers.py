@@ -251,7 +251,15 @@ class EodhdProvider(PriceDataProvider):
             rows.append(row)
         if len(rows) < 3:
             raise RuntimeError("EODHD returned fewer than three usable observations")
-        return {"provider": self.name, "source": url,
+        parsed_url = urllib.parse.urlsplit(url)
+        safe_url = urllib.parse.urlunsplit(
+            (parsed_url.scheme, parsed_url.netloc, parsed_url.path,
+             urllib.parse.urlencode({
+                 key: value for key, value in urllib.parse.parse_qsl(parsed_url.query)
+                 if key.lower() not in {"api_token", "apikey", "token"}
+             }), "")
+        )
+        return {"provider": self.name, "source": safe_url,
                 "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "raw_observations": len(payload), "rows": rows}
 
