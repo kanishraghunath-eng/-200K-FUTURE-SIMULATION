@@ -130,7 +130,7 @@ def main():
     args = parser.parse_args()
     report = run_study()
     output = Path(args.output)
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     print(f"Saved report: {output}")
 
