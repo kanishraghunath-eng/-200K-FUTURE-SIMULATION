@@ -5,6 +5,7 @@ from pathlib import Path
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import canonicalize_rows, validate_canonical_rows
 from engine.providers import CsvProvider, ProviderRegistry
+from scripts.evaluate_dataset_manifest_oos import evaluate_dataset
 
 
 def manifest(**overrides):
@@ -69,6 +70,22 @@ class ProviderTests(unittest.TestCase):
             registry.register(provider)
             self.assertEqual(registry.names(),("csv",))
             self.assertIs(registry.get("csv"),provider)
+
+    def test_manifest_runner_labels_short_history_insufficient(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/"short.csv"
+            path.write_text("date,close\\n2026-01-01,100\\n2026-01-02,101\\n2026-01-03,99\\n",
+                            encoding="utf-8")
+            item = {
+                "instrument_id":"DEMO", "asset_class":"equity_index",
+                "source":"synthetic plumbing fixture", "currency":"INR",
+                "interval":"daily", "timezone":"Asia/Kolkata",
+                "adjustment_basis":"unknown", "provider":"csv", "path":str(path),
+                "horizon":2, "min_train":3, "estimation_window":3,
+            }
+            result = evaluate_dataset(item, paths=20)
+            self.assertEqual(result["status"], "insufficient_data")
+            self.assertGreater(result["required_observations"], result["observations"])
 
 
 if __name__ == "__main__":
