@@ -19,6 +19,8 @@ on:
       - "datasets/multi_asset_manifest.json"
       - "tests/**"
       - "docs/OOS_VALIDATION_MASTER_PLAN.md"
+      - "docs/DATA_SOURCE_AND_ADJUSTMENT_AUDIT.md"
+      - "docs/CONFIRMATORY_OOS_PROTOCOL_v1.md"
       - ".github/workflows/multi-market-oos.yml"
   workflow_dispatch:
 
