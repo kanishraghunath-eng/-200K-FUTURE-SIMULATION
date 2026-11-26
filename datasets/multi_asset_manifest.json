@@ -50,7 +50,9 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "include_ohlcv": false,
+      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed."
     },
     {
       "instrument_id": "BTC-USD",
@@ -85,7 +87,9 @@
       "price_field": "close",
       "horizon": 5,
       "min_train": 252,
-      "estimation_window": 252
+      "estimation_window": 252,
+      "include_ohlcv": false,
+      "notes": "Close-only OOS dataset: raw OHLCV intentionally excluded because the close-only model does not consume those fields; OHLCV consistency is not claimed."
     },
     {
       "instrument_id": "TLT",
@@ -151,12 +155,12 @@
       "corporate_actions_reviewed": false,
       "provider": "yahoo",
       "price_field": "close",
-      "start": "2024-11-26",
+      "start": "2025-01-01",
       "end": "2026-11-26",
       "horizon": 5,
       "min_train": 252,
       "estimation_window": 252,
-      "notes": "Hourly sample added for multi-timeframe exploratory validation; vendor intraday availability and session gaps require review."
+      "notes": "Hourly sample added for multi-timeframe exploratory validation; shorter than Yahoo's intraday history limit. Session gaps and vendor availability require review."
     }
   ]
 }
