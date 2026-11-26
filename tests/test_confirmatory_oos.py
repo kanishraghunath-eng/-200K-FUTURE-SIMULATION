@@ -22,7 +22,22 @@ def payload(item):
     return {
         "protocol_id": "fixture-v1", "status": "preregistered_waiting_for_future_holdout",
         "freeze_date": "2026-11-26", "holdout_start": "2026-11-27",
-        "acceptance_criteria": {"alpha": 0.05},
+        "acceptance_criteria": {
+            "alpha": 0.05, "minimum_family_coverage": 1,
+            "bootstrap_replicates": 200, "block_length_observations": 5,
+            "minimum_oos_forecasts_per_instrument": 250,
+        },
+        "frozen_model_configuration": {
+            "paths_per_forecast": 1000, "seed": 7,
+            "target_pct": 0.03, "stop_pct": 0.02,
+            "horizon_observations": item.get("horizon", 5),
+            "min_train_observations": item.get("min_train", 252),
+            "estimation_window": item.get("estimation_window", 252),
+            "calibration_window": item.get("calibration_window", 252),
+            "min_calibration_observations": item.get("min_calibration_observations", 100),
+            "min_calibration_improvement": 0.0,
+            "drift_convention": "corrected",
+        },
         "datasets": [item], "blocked_candidates": [],
     }
 
@@ -63,8 +78,8 @@ class ConfirmatoryOOSTests(unittest.TestCase):
         data = evaluated(timestamps, rows)
         with patch("scripts.run_confirmatory_oos.evaluate_dataset", return_value=data):
             report = run_confirmatory_manifest(
-                payload(item), paths=100, replicates=200,
-                minimum_forecasts=2,
+                payload(item), paths=1000, replicates=200,
+                minimum_forecasts=250,
             )
         self.assertEqual(report["status"], "awaiting_future_holdout")
         self.assertEqual(report["awaiting_future_holdout"][0]["holdout_forecasts_available"], 1)
@@ -82,7 +97,9 @@ class ConfirmatoryOOSTests(unittest.TestCase):
             corporate_action_audit={"status": "unavailable"},
         )
         with patch("scripts.run_confirmatory_oos.evaluate_dataset", return_value=data):
-            report = run_confirmatory_manifest(payload(item), minimum_forecasts=1)
+            report = run_confirmatory_manifest(
+                payload(item), paths=1000, replicates=200, minimum_forecasts=250
+            )
         self.assertEqual(report["status"], "blocked_preconditions")
         self.assertIn("corporate_action_reconciliation:unavailable",
                       report["precondition_failures"][0]["blockers"])
@@ -90,7 +107,9 @@ class ConfirmatoryOOSTests(unittest.TestCase):
     def test_missing_dataset_hash_blocks_confirmation(self):
         data = evaluated(["2026-11-27"], [], source_sha256=None)
         with patch("scripts.run_confirmatory_oos.evaluate_dataset", return_value=data):
-            report = run_confirmatory_manifest(payload(base_item()))
+            report = run_confirmatory_manifest(
+                payload(base_item()), paths=1000, replicates=200, minimum_forecasts=250
+            )
         self.assertEqual(report["status"], "blocked_preconditions")
         self.assertIn("missing_source_or_canonical_hash",
                       report["precondition_failures"][0]["blockers"])
