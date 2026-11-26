@@ -2,7 +2,7 @@
 
 Status: pre-registered; waiting for future observations.
 Freeze date: 2026-11-26.
-Untouched holdout start: 2026-11-27.
+Untouched holdout: 2026-11-27 through 2027-12-31 inclusive.
 Manifest: `datasets/confirmatory_oos_manifest.json`.
 Runner: `scripts/run_confirmatory_oos.py`.
 
@@ -48,7 +48,8 @@ Primary metric:
 `Brier Skill = 1 - (model multiclass Brier / causal baseline multiclass Brier)`
 
 For every instrument:
-- At least 250 fully matured holdout forecasts, with forecast origins on or after 2026-11-27.
+- At least 250 fully matured holdout forecasts per instrument, with forecast origins on or after 2026-11-27 and no later than 2027-12-31.
+- The holdout end date is fixed; no early evaluation, repeated peeking, or extension after inspecting results.
 - 5,000 circular moving-block bootstrap replicates, block length 5 observations.
 - One-sided bootstrap p-values adjusted with Holm across the complete seven-instrument family.
 - Instrument passes only if the 95% confidence interval lower bound is greater than zero and the Holm-adjusted p-value is below 0.05.
@@ -64,7 +65,7 @@ No sorting, interpolation, filling, resampling, retroactive manual correction, o
 
 ## Why no confirmatory score exists yet
 
-The freeze date is 2026-11-26. At protocol creation, the holdout has not begun. The readiness runner therefore reports `awaiting_future_holdout` until every instrument has 250 matured forecast origins. This is intentional; earlier exploratory data cannot be relabelled as untouched confirmatory evidence.
+The freeze date is 2026-11-26. At protocol creation, the holdout has not begun. The readiness runner therefore reports `awaiting_future_holdout` until the fixed window has ended and every instrument has 250 matured forecast origins. This is intentional; earlier exploratory data cannot be relabelled as untouched confirmatory evidence. If the fixed window ends with fewer than 250 forecasts for any candidate, the result is insufficient sample and the protocol is not silently extended.
 
 ## Interpretation boundary
 
