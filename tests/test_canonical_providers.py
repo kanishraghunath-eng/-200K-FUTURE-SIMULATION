@@ -237,10 +237,13 @@ class ProviderTests(unittest.TestCase):
         payload = [{"date":"2026-01-05","close":100,"adjusted_close":99},
                    {"date":"2026-01-06","close":101,"adjusted_close":100},
                    {"date":"2026-01-07","close":99,"adjusted_close":98}]
-        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
-            result = EodhdProvider().fetch(manifest(price_field="adjusted_close"))
+        with patch.dict("os.environ", {"EODHD_API_TOKEN": "test-secret"}):
+            with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+                result = EodhdProvider().fetch(manifest(price_field="adjusted_close"))
         self.assertEqual(result["provider"], "eodhd")
         self.assertEqual([float(x["close"]) for x in result["rows"]], [99,100,98])
+        self.assertNotIn("test-secret", result["source"])
+        self.assertNotIn("api_token", result["source"])
 
     def test_stooq_rejects_adjusted_close_request(self):
         with self.assertRaisesRegex(ValueError, "raw close"):
