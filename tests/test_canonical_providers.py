@@ -5,7 +5,7 @@ from pathlib import Path
 
 from engine.dataset_manifest import DatasetManifest
 from engine.canonical_data import canonicalize_rows, validate_canonical_rows
-from engine.providers import (CsvProvider, ProviderRegistry, YahooFinanceChartProvider, StooqCsvProvider)
+from engine.providers import (CsvProvider, ProviderRegistry, YahooFinanceChartProvider, StooqCsvProvider, EodhdProvider)
 from scripts.evaluate_dataset_manifest_oos import evaluate_dataset
 
 
@@ -102,6 +102,16 @@ class ProviderTests(unittest.TestCase):
             result = StooqCsvProvider().fetch(manifest(instrument_id="spy.us"))
         self.assertEqual(result["provider"], "stooq")
         self.assertEqual(len(result["rows"]), 3)
+
+    def test_eodhd_provider_maps_adjusted_close(self):
+        import json
+        payload = [{"date":"2026-01-05","close":100,"adjusted_close":99},
+                   {"date":"2026-01-06","close":101,"adjusted_close":100},
+                   {"date":"2026-01-07","close":99,"adjusted_close":98}]
+        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+            result = EodhdProvider().fetch(manifest(price_field="adjusted_close"))
+        self.assertEqual(result["provider"], "eodhd")
+        self.assertEqual([float(x["close"]) for x in result["rows"]], [99,100,98])
 
     def test_stooq_rejects_adjusted_close_request(self):
         with self.assertRaisesRegex(ValueError, "raw close"):
