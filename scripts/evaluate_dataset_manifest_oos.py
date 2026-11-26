@@ -36,7 +36,13 @@ def evaluate_dataset(item, paths=1000):
         provider = StooqCsvProvider()
     else:
         raise ValueError(f"unsupported provider: {provider_name}")
-    fetched = provider.fetch(manifest, item.get("start"), item.get("end"))
+    try:
+        fetched = provider.fetch(manifest, item.get("start"), item.get("end"))
+    except Exception as exc:
+        return {"instrument_id": manifest.instrument_id, "asset_class": manifest.asset_class,
+                "provider": provider_name, "status": "provider_error",
+                "error_type": type(exc).__name__, "error": str(exc)[:500],
+                "manifest": manifest.to_dict()}
     audit = validate_canonical_rows(fetched["rows"], manifest,
                                     require_timezone=bool(item.get("require_timezone", False)))
     if provider_name == "csv":
