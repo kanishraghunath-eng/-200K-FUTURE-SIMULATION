@@ -74,7 +74,7 @@ class ProviderTests(unittest.TestCase):
     def test_manifest_runner_labels_short_history_insufficient(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)/"short.csv"
-            path.write_text("date,close\\n2026-01-01,100\\n2026-01-02,101\\n2026-01-03,99\\n",
+            path.write_text("date,close\n2026-01-01,100\n2026-01-02,101\n2026-01-03,99\n",
                             encoding="utf-8")
             item = {
                 "instrument_id":"DEMO", "asset_class":"equity_index",
