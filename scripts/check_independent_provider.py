@@ -3,6 +3,9 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from scripts.evaluate_multi_market_oos import fetch_adjusted_close, cross_provider_check
 
 
@@ -21,7 +24,7 @@ def main():
         "interpretation": "Vendor consistency check only; not market forecast validation.",
     }
     Path("provider_crosscheck_report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(json.dumps(report, indent=2, sort_keys=True))
 
