@@ -75,6 +75,31 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
                   if item.get("confirmatory_candidate", True)]
     if not candidates:
         raise ValueError("confirmatory manifest contains no candidate datasets")
+    acceptance = payload["acceptance_criteria"]
+    frozen = payload["frozen_model_configuration"]
+    if len(candidates) < int(acceptance["minimum_family_coverage"]):
+        raise ValueError("candidate family is smaller than the pre-registered minimum coverage")
+    if paths != int(frozen["paths_per_forecast"]):
+        raise ValueError("paths differs from the frozen protocol configuration")
+    if replicates != int(acceptance["bootstrap_replicates"]):
+        raise ValueError("bootstrap replicates differ from the pre-registered protocol")
+    if minimum_forecasts != int(acceptance["minimum_oos_forecasts_per_instrument"]):
+        raise ValueError("minimum forecast count differs from the pre-registered protocol")
+    if block_length != int(acceptance["block_length_observations"]):
+        raise ValueError("block length differs from the pre-registered protocol")
+    frozen_item_fields = {
+        "horizon": "horizon_observations",
+        "min_train": "min_train_observations",
+        "estimation_window": "estimation_window",
+        "calibration_window": "calibration_window",
+        "min_calibration_observations": "min_calibration_observations",
+    }
+    for item in candidates:
+        for item_field, frozen_field in frozen_item_fields.items():
+            if int(item.get(item_field, frozen[frozen_field])) != int(frozen[frozen_field]):
+                raise ValueError(
+                    f"{item['instrument_id']} overrides frozen setting {item_field}"
+                )
 
     precondition_failures = []
     awaiting = []
@@ -161,16 +186,18 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
         prices = entry["prices"]
         diagnostic = walk_forward_barrier_diagnostic(
             prices,
-            target_pct=float(item.get("target_pct", 0.03)),
-            stop_pct=float(item.get("stop_pct", 0.02)),
-            horizon=int(item.get("horizon", 5)),
-            min_train=int(item.get("min_train", 252)),
+            entry_offset=float(frozen.get("entry_offset", 0.0)),
+            target_pct=float(frozen["target_pct"]),
+            stop_pct=float(frozen["stop_pct"]),
+            horizon=int(frozen["horizon_observations"]),
+            min_train=int(frozen["min_train_observations"]),
             paths=paths,
-            seed=int(item.get("seed", 7)),
-            estimation_window=int(item.get("estimation_window", 252)),
-            calibration_window=int(item.get("calibration_window", 252)),
-            min_calibration_observations=int(item.get("min_calibration_observations", 100)),
-            min_calibration_improvement=float(item.get("min_calibration_improvement", 0.0)),
+            seed=int(frozen["seed"]),
+            drift_convention=frozen.get("drift_convention", "corrected"),
+            estimation_window=int(frozen["estimation_window"]),
+            calibration_window=int(frozen["calibration_window"]),
+            min_calibration_observations=int(frozen["min_calibration_observations"]),
+            min_calibration_improvement=float(frozen["min_calibration_improvement"]),
             periods_per_year=int(evaluated["manifest"]["effective_periods_per_year"]),
             step_year_fraction=float(item.get(
                 "step_year_fraction",
@@ -217,7 +244,7 @@ def run_confirmatory_manifest(payload, paths=1000, replicates=5000,
             item["bootstrap"].get("status") == "estimated"
             and ci[0] is not None and ci[0] > 0
             and item.get("holm_adjusted_p_value", 1.0) < float(
-                payload["acceptance_criteria"]["alpha"]
+                acceptance["alpha"]
             )
         )
     report["results"] = results
