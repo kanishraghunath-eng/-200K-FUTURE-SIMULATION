@@ -106,6 +106,22 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             YahooFinanceChartProvider().fetch(manifest(interval="4h", periods_per_year=1638))
 
+    def test_yahoo_provider_maps_hourly_chart_payload(self):
+        import json
+        import datetime
+        stamps = [int(datetime.datetime(2026, 1, 5, hour,
+                                        tzinfo=datetime.timezone.utc).timestamp())
+                  for hour in (14, 15, 16)]
+        payload = {"chart":{"result":[{"timestamp":stamps,
+                   "indicators":{"quote":[{"close":[100,101,99]}]}}],"error":None}}
+        with patch("urllib.request.urlopen", return_value=FakeResponse(json.dumps(payload).encode())):
+            result = YahooFinanceChartProvider().fetch(
+                manifest(interval="1h", periods_per_year=1638)
+            )
+        self.assertEqual(result["provider"], "yahoo")
+        self.assertEqual([float(x["close"]) for x in result["rows"]], [100,101,99])
+        self.assertTrue(all("T" in x["timestamp"] for x in result["rows"]))
+
     def test_yahoo_provider_maps_chart_payload(self):
         import json
         import datetime
