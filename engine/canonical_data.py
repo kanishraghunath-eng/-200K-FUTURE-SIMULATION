@@ -26,8 +26,8 @@ def canonicalize_rows(rows, timestamp_column="date", close_column="close",
         output.append({
             "timestamp": row[timestamp_column],
             "close": row[close_column],
-            "currency": currency,
-            "price_basis": price_basis,
+            "currency": row.get("currency", currency),
+            "price_basis": row.get("price_basis", price_basis),
         })
     return output
 
