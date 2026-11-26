@@ -41,7 +41,7 @@ jobs:
         run: |
           python scripts/evaluate_multi_market_oos.py \
             --paths 1000 \
-            --convergence-samples-per-fold 4 \
+            --convergence-samples-per-fold 20 \
             --output multi_market_oos_report.json
 
       - name: Upload validation report
