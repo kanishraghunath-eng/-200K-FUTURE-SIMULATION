@@ -22,6 +22,7 @@ def payload(item):
     return {
         "protocol_id": "fixture-v1", "status": "preregistered_waiting_for_future_holdout",
         "freeze_date": "2026-11-26", "holdout_start": "2026-11-27",
+        "holdout_end": "2027-12-31",
         "acceptance_criteria": {
             "alpha": 0.05, "minimum_family_coverage": 1,
             "bootstrap_replicates": 200, "block_length_observations": 5,
