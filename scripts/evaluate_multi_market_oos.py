@@ -337,6 +337,79 @@ def convergence_check(dataset_rows, samples_per_fold):
     }
 
 
+def selected_200k_market_convergence(dataset_rows):
+    """Compare 10k and 200k streamed path summaries at fixed real-market origins."""
+    dates = [x[0] for x in dataset_rows]
+    closes = [x[1] for x in dataset_rows]
+    selected_names = {
+        "COVID shock and rebound", "2022 tightening/bear",
+        "2025 holdout", "2026 holdout YTD",
+    }
+    comparisons = []
+    probability_keys = (
+        "target_first_probability", "stop_first_probability",
+        "neither_probability", "same_step_ambiguous_probability",
+    )
+    for fold in FOLDS:
+        if fold["name"] not in selected_names:
+            continue
+        start = next((i for i, d in enumerate(dates) if d >= fold["start"]), None)
+        end = next((i for i, d in enumerate(dates) if d > fold["end"]), len(dates))
+        if start is None or start < ESTIMATION or end - start <= HORIZON:
+            continue
+        origin = start + (end - start) // 2
+        train = closes[max(0, origin - ESTIMATION + 1):origin + 1]
+        if len(train) < ESTIMATION:
+            continue
+        entry = float(train[-1])
+        target = entry * (1.0 + TARGET)
+        stop = entry * (1.0 - STOP)
+        for seed_base in CONVERGENCE_SEEDS:
+            seed = seed_base + origin
+            summaries = {}
+            for n_paths in (10000, 200000):
+                simulation = simulate_price_paths(
+                    train, HORIZON, paths=n_paths, seed=seed,
+                    drift_mode="historical", periods_per_year=252,
+                    chunk_size=10000, return_paths=False,
+                    entry=entry, target=target, stop=stop,
+                )
+                summaries[str(n_paths)] = simulation["summary"]
+            small, large = summaries["10000"], summaries["200000"]
+            differences = {
+                key: abs(small[key] - large[key]) for key in probability_keys
+            }
+            standard_errors = {
+                key: math.sqrt(max(0.0, large[key] * (1.0 - large[key]) / 200000))
+                for key in probability_keys
+            }
+            comparisons.append({
+                "fold": fold["name"],
+                "origin_date": dates[origin],
+                "seed_base": seed_base,
+                "seed": seed,
+                "probability_abs_differences_10k_vs_200k": differences,
+                "mean_abs_probability_difference": sum(
+                    differences[key] for key in probability_keys[:3]
+                ) / 3.0,
+                "monte_carlo_standard_errors_at_200k": standard_errors,
+                "paths_10000": small,
+                "paths_200000": large,
+            })
+    values = sorted(x["mean_abs_probability_difference"] for x in comparisons)
+    p95_index = min(len(values) - 1, math.ceil(0.95 * len(values)) - 1) if values else None
+    return {
+        "comparisons": comparisons,
+        "sample_count": len(comparisons),
+        "path_counts": [10000, 200000],
+        "seed_bases": list(CONVERGENCE_SEEDS),
+        "mean_abs_probability_difference": sum(values) / len(values) if values else None,
+        "p95_abs_probability_difference": values[p95_index] if p95_index is not None else None,
+        "max_abs_probability_difference": max(values) if values else None,
+        "interpretation": "Selected real-market historical origins; numerical sampling stability only, not forecast accuracy.",
+    }
+
+
 def cross_provider_check(yahoo_rows, symbol="VTI"):
     """Compare Yahoo adjusted returns with EODHD adjusted returns for VTI."""
     public_url = f"https://eodhd.com/api/eod/{symbol}.US"
@@ -417,6 +490,7 @@ def main():
             "monte_carlo_convergence": convergence_check(
                 rows, args.convergence_samples_per_fold
             ),
+            "selected_200k_market_convergence": selected_200k_market_convergence(rows),
         }
 
     aggregate_by_gate = defaultdict(list)
@@ -457,7 +531,7 @@ def main():
         "data_provider_note": "One third-party provider across multiple instruments; not independent vendor replication.",
         "settings": {
             "oos_paths_per_origin": args.paths,
-            "convergence_path_counts": [5000, 10000],
+            "convergence_path_counts": [5000, 10000, 200000],
             "convergence_samples_per_fold_per_instrument": args.convergence_samples_per_fold,
             "convergence_random_seeds": list(CONVERGENCE_SEEDS),
             "symbols": SYMBOLS,
