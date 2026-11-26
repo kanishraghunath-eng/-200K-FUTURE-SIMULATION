@@ -8,6 +8,7 @@ from engine.providers import YahooFinanceChartProvider
 from engine.dataset_manifest import DatasetManifest
 from scripts.evaluate_multi_market_oos import (
     apply_holm_adjustment, block_bootstrap_skill_interval,
+    selected_200k_market_convergence,
 )
 
 
@@ -120,6 +121,30 @@ class StatisticalValidationTests(unittest.TestCase):
         self.assertEqual(first["brier_skill_ci_95"], second["brier_skill_ci_95"])
         self.assertGreater(first["brier_skill_ci_95"][0], 0.0)
         self.assertEqual(first["replicates"], 200)
+
+
+    def test_selected_200k_market_convergence_uses_fixed_realistic_origins(self):
+        from datetime import date, timedelta
+
+        start = date(2000, 1, 1)
+        end = date(2026, 11, 26)
+        rows = []
+        current = start
+        index = 0
+        while current <= end:
+            price = 100.0 * np.exp(0.0001 * index + 0.01 * np.sin(index / 9.0))
+            rows.append((current.isoformat(), float(price)))
+            current += timedelta(days=1)
+            index += 1
+
+        result = selected_200k_market_convergence(rows)
+        self.assertEqual(result["path_counts"], [10000, 200000])
+        self.assertEqual(result["sample_count"], 12)
+        self.assertEqual(len(result["comparisons"]), 12)
+        self.assertTrue(all(x["paths_200000"]["path_count"] == 200000
+                            for x in result["comparisons"]))
+        self.assertIsNotNone(result["mean_abs_probability_difference"])
+
 
     def test_holm_adjustment_is_monotonic_and_family_scoped(self):
         def score(p):
