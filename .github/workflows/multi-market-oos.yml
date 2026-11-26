@@ -6,6 +6,10 @@ on:
     paths:
       - "engine/**"
       - "scripts/evaluate_multi_market_oos.py"
+      - "scripts/evaluate_dataset_manifest_oos.py"
+      - "engine/dataset_manifest.py"
+      - "engine/canonical_data.py"
+      - "engine/providers.py"
       - "tests/**"
       - ".github/workflows/multi-market-oos.yml"
   workflow_dispatch:
@@ -38,7 +42,10 @@ jobs:
       - name: Run unit and regression tests
         run: python -m unittest discover -s tests -v
 
-      - name: Run multi-market held-out evaluation
+      - name: Smoke-check manifest-driven multi-market runner
+        run: python scripts/evaluate_dataset_manifest_oos.py --help
+
+      - name: Run existing multi-market held-out evaluation
         env:
           STOOQ_API_KEY: ${{ secrets.STOOQ_API_KEY }}
         run: |
